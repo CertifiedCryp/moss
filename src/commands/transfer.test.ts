@@ -29,7 +29,7 @@ describe("wallet transfer", () => {
     const result = await runWalletTransfer(
       {
         amount: "0.1",
-        network: "testnet",
+        network: "mainnet",
         pollIntervalMs: 25,
         timeoutMs: 5_000,
         to: recipient,
@@ -52,7 +52,7 @@ describe("wallet transfer", () => {
           value: 100000000000000000n,
         },
       ],
-      network: "testnet",
+      network: "mainnet",
       pollIntervalMs: 25,
       timeoutMs: 5_000,
     });
@@ -72,7 +72,7 @@ describe("wallet transfer", () => {
       {
         amount: "100",
         decimals: 18,
-        network: "testnet",
+        network: "mainnet",
         pollIntervalMs: 1,
         timeoutMs: 1_000,
         to: recipient,
@@ -95,7 +95,7 @@ describe("wallet transfer", () => {
           value: 0n,
         },
       ],
-      network: "testnet",
+      network: "mainnet",
       pollIntervalMs: 1,
       timeoutMs: 1_000,
     });
@@ -114,7 +114,7 @@ describe("wallet transfer", () => {
       runWalletTransfer(
         {
           amount: "100",
-          network: "testnet",
+          network: "mainnet",
           pollIntervalMs: 1,
           timeoutMs: 1_000,
           to: recipient,
@@ -123,6 +123,29 @@ describe("wallet transfer", () => {
         dependencies(),
       ),
     ).rejects.toThrow("provide --decimals for ERC20 transfers");
+  });
+
+  it("rejects testnet before executing transfer calls", async () => {
+    const execute = vi.fn(async () => executionResult());
+
+    await expect(
+      runWalletTransfer(
+        {
+          amount: "0.1",
+          network: "testnet",
+          pollIntervalMs: 1,
+          timeoutMs: 1_000,
+          to: recipient,
+        },
+        dependencies({
+          executeWalletCalls: execute,
+          stdout: memoryOutput(),
+        }),
+      ),
+    ).rejects.toThrow(
+      "testnet is not supported yet. Omit --network to use mainnet until the wallet path is available.",
+    );
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("registers the reachable wallet transfer command", async () => {
@@ -227,13 +250,13 @@ function executionResult(): ExecuteCommandResult {
     accessAddress,
     accountAddress,
     id: bundleId,
-    network: "testnet",
+    network: "mainnet",
     receipts: [
       {
         blockHash:
           "0x5555555555555555555555555555555555555555555555555555555555555555",
         blockNumber: 1,
-        chainId: 6342,
+        chainId: 4326,
         gasUsed: 21_000,
         logs: [],
         status: "0x1",

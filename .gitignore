@@ -2,3 +2,4 @@ plugins/*
 .agents/*
 dist/
 node_modules/
+.e2e/

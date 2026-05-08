@@ -33,7 +33,7 @@ describe("wallet call", () => {
       {
         data: "0x70a08231",
         json: true,
-        network: "testnet",
+        network: "mainnet",
         rpcUrl,
         to: target,
       },
@@ -50,11 +50,35 @@ describe("wallet call", () => {
     expect(result.result).toBe("0x1234");
     expect(JSON.parse(stdout.text)).toEqual({
       data: "0x70a08231",
-      network: "testnet",
+      network: "mainnet",
       result: "0x1234",
       rpcUrl: `${rpcUrl}/`,
       to: target,
     });
+  });
+
+  it("rejects testnet until a supported wallet path exists", async () => {
+    const client = {
+      call: vi.fn().mockResolvedValue("0x1234"),
+    };
+
+    await expect(
+      runWalletCall(
+        {
+          data: "0x",
+          network: "testnet",
+          rpcUrl,
+          to: target,
+        },
+        {
+          createClient: () => client,
+          stdout: memoryOutput(),
+        },
+      ),
+    ).rejects.toThrow(
+      "testnet is not supported yet. Omit --network to use mainnet until the wallet path is available.",
+    );
+    expect(client.call).not.toHaveBeenCalled();
   });
 
   it("encodes ABI function calls before eth_call", async () => {
@@ -77,7 +101,7 @@ describe("wallet call", () => {
         abi: abiPath,
         args: JSON.stringify([account]),
         function: "balanceOf",
-        network: "testnet",
+        network: "mainnet",
         rpcUrl,
         terse: true,
         to: target,
@@ -107,7 +131,7 @@ describe("wallet call", () => {
           abi: abiPath,
           args: '{"account":"0x1"}',
           function: "balanceOf",
-          network: "testnet",
+          network: "mainnet",
           rpcUrl,
           to: target,
         },
@@ -122,7 +146,7 @@ describe("wallet call", () => {
       runWalletCall(
         {
           data: "0x123",
-          network: "testnet",
+          network: "mainnet",
           rpcUrl,
           to: target,
         },
@@ -141,7 +165,7 @@ describe("wallet call", () => {
       runWalletCall(
         {
           data,
-          network: "testnet",
+          network: "mainnet",
           rpcUrl,
           to: target,
         },

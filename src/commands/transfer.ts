@@ -6,6 +6,13 @@ import {
   type ExecuteCommandResult,
   type ExecuteWalletCallsOptions,
 } from "./execute.js";
+import {
+  defaultNetwork,
+  isNetwork,
+  isSupportedNetwork,
+  type Network,
+  unsupportedNetworkMessage,
+} from "../config/chains.js";
 import { CliError } from "../errors.js";
 import { normalizeAddress } from "../eth/client.js";
 import { encodeErc20TransferCall, parseDecimalUnits } from "../eth/erc20.js";
@@ -67,7 +74,7 @@ export function registerTransferCommand(
     .requiredOption("--amount <amount>", "amount in ETH or token units")
     .option("--token <address>", "ERC20 token contract address")
     .option("--decimals <decimals>", "ERC20 token decimals", parseDecimals)
-    .option("--network <network>", "MegaETH network", "testnet")
+    .option("--network <network>", "MegaETH network", defaultNetwork)
     .option(
       "--poll-interval-ms <ms>",
       "relay status polling interval",
@@ -91,12 +98,13 @@ export async function runWalletTransfer(
   options: TransferCommandOptions,
   dependencies: TransferCommandDependencies = {},
 ): Promise<TransferCommandResult> {
+  const network = normalizeNetwork(options.network);
   const transfer = buildTransfer(options);
   const executor = dependencies.executeWalletCalls ?? executeWalletCalls;
   const execution = await executor(
     {
       calls: [transfer.call],
-      network: options.network,
+      network,
       pollIntervalMs: options.pollIntervalMs,
       timeoutMs: options.timeoutMs,
     },
@@ -232,4 +240,16 @@ function parsePositiveInteger(value: string): number {
   }
 
   return parsed;
+}
+
+function normalizeNetwork(value: string | undefined): Network {
+  const network = value ?? defaultNetwork;
+  if (!isNetwork(network)) {
+    throw new CliError(`unsupported network: ${network}`);
+  }
+  if (!isSupportedNetwork(network)) {
+    throw new CliError(unsupportedNetworkMessage(network));
+  }
+
+  return network;
 }

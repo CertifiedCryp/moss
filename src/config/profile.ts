@@ -13,7 +13,7 @@ import { dirname } from "node:path";
 
 import { CliError } from "../errors.js";
 import { redactSecrets } from "../output.js";
-import { isNetwork, type Network } from "./chains.js";
+import { defaultNetwork, isNetwork, type Network } from "./chains.js";
 import { getProfilePath } from "./paths.js";
 
 export type HexString = `0x${string}`;
@@ -99,8 +99,12 @@ export async function readWalletProfile(
     return parseWalletProfile(JSON.parse(raw));
   } catch (error) {
     if (isNodeError(error, "ENOENT")) {
+      const loginInstruction =
+        network === defaultNetwork
+          ? "wallet login"
+          : `wallet login --network ${network}`;
       throw new CliError(
-        `no ${network} wallet profile found; run mega wallet login --network ${network}`,
+        `no ${network} wallet profile found; run ${loginInstruction}`,
       );
     }
 

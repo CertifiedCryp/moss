@@ -121,7 +121,7 @@ describe("wallet execute", () => {
             value: "7",
           },
         ],
-        network: "testnet",
+        network: "mainnet",
         pollIntervalMs: 1,
         timeoutMs: 1_000,
       },
@@ -136,7 +136,7 @@ describe("wallet execute", () => {
       accessAddress,
       accountAddress,
       id: bundleId,
-      network: "testnet",
+      network: "mainnet",
       status: 200,
     });
     expect(result.receipts?.[0]?.transactionHash).toBe(txHash);
@@ -155,11 +155,35 @@ describe("wallet execute", () => {
       executeWalletCalls(
         {
           calls: [{ data: "0x", to: target }],
-          network: "testnet",
+          network: "mainnet",
         },
         dependencies({ relayActions }),
       ),
     ).rejects.toThrow("permission not granted for delegated key");
+  });
+
+  it("rejects testnet before reading a profile or contacting the relay", async () => {
+    const relayActions = fakeRelayActions();
+    const readProfile = vi.fn(async () => makeProfile());
+
+    await expect(
+      executeWalletCalls(
+        {
+          calls: [{ data: "0x", to: target }],
+          network: "testnet",
+        },
+        {
+          createRelayClient: () => ({}),
+          readProfile,
+          relayActions,
+        },
+      ),
+    ).rejects.toThrow(
+      "testnet is not supported yet. Omit --network to use mainnet until the wallet path is available.",
+    );
+
+    expect(readProfile).not.toHaveBeenCalled();
+    expect(relayActions.prepareCalls).not.toHaveBeenCalled();
   });
 
   it("rejects expired profiles before reconstructing relay actions", async () => {
@@ -169,7 +193,7 @@ describe("wallet execute", () => {
       executeWalletCalls(
         {
           calls: [{ data: "0x", to: target }],
-          network: "testnet",
+          network: "mainnet",
         },
         dependencies({
           now: () => new Date("2026-05-07T00:00:00.000Z"),
@@ -196,7 +220,7 @@ describe("wallet execute", () => {
       executeWalletCalls(
         {
           calls: [{ data: longCalldata, to: target }],
-          network: "testnet",
+          network: "mainnet",
         },
         dependencies({ relayActions }),
       ),
@@ -352,7 +376,7 @@ function confirmedStatus(): Awaited<
         blockHash:
           "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         blockNumber: 1,
-        chainId: 6342,
+        chainId: 4326,
         gasUsed: 21_000,
         logs: [],
         status: "0x1",
@@ -370,7 +394,7 @@ function makeProfile(
 ): WalletProfile {
   return {
     version: 1,
-    network: "testnet",
+    network: "mainnet",
     accountAddress,
     accessAddress,
     privateKey,

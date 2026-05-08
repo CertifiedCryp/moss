@@ -1,6 +1,12 @@
 import { Command } from "commander";
 
-import { isNetwork, type Network } from "../config/chains.js";
+import {
+  defaultNetwork,
+  isNetwork,
+  isSupportedNetwork,
+  type Network,
+  unsupportedNetworkMessage,
+} from "../config/chains.js";
 import { CliError } from "../errors.js";
 import { encodeAbiCall, loadAbiFile, parseAbiArgs } from "../eth/abi.js";
 import {
@@ -53,7 +59,7 @@ export function registerCallCommand(
     .option("--abi <path>", "contract ABI JSON file")
     .option("--function <name>", "ABI function name")
     .option("--args <json>", "ABI function args as a JSON array")
-    .option("--network <network>", "MegaETH network", "testnet")
+    .option("--network <network>", "MegaETH network", defaultNetwork)
     .option("--rpc-url <url>", "Ethereum JSON-RPC URL")
     .option("--json", "print JSON output")
     .option("-t, --terse", "print compact output")
@@ -134,9 +140,12 @@ async function resolveCallData(
 }
 
 function normalizeNetwork(value: string | undefined): Network {
-  const network = value ?? "testnet";
+  const network = value ?? defaultNetwork;
   if (!isNetwork(network)) {
     throw new CliError(`unsupported network: ${network}`);
+  }
+  if (!isSupportedNetwork(network)) {
+    throw new CliError(unsupportedNetworkMessage(network));
   }
 
   return network;

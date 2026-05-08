@@ -6,7 +6,7 @@ description: Use the MegaETH Wallet CLI for local loopback login, profile inspec
 # MegaETH Wallet CLI
 
 Use this skill when an agent needs to operate a local MegaETH wallet through the
-`mega` CLI.
+`wallet` CLI.
 
 ## Safety Rules
 
@@ -14,8 +14,8 @@ Use this skill when an agent needs to operate a local MegaETH wallet through the
   passkeys, WebAuthn material, or relay secrets.
 - Treat profile files as local secrets. Do not copy profile contents into chat,
   issue comments, logs, or telemetry.
-- Use `mega wallet call` for read-only `eth_call` workflows.
-- Use `mega wallet execute` or `mega wallet transfer` only when the user asked
+- Use `wallet call` for read-only `eth_call` workflows.
+- Use `wallet execute` or `wallet transfer` only when the user asked
   for a state-changing operation.
 - Prefer `--json` for machine-readable output and `-t` only for compact text.
 
@@ -24,7 +24,7 @@ Use this skill when an agent needs to operate a local MegaETH wallet through the
 Run loopback login on the same machine as the browser:
 
 ```bash
-mega wallet login --network testnet
+wallet login
 ```
 
 The CLI opens MegaETH Wallet in the system browser, listens on
@@ -32,11 +32,22 @@ The CLI opens MegaETH Wallet in the system browser, listens on
 delegated-key profile locally. The callback must not contain private keys or
 transferable bearer credentials.
 
+Login defaults to `https://account.megaeth.com` and
+`https://wallet-relay.megaeth.com`. Use `--wallet-url` only when testing a local
+wallet UI, and use `--relay-url` only for an explicit non-canonical relay.
+
+Default login permissions use ETH as the fee token with a `0.01 ETH` allowance,
+and daily spend caps of `0.01 ETH` plus `20 USDM`. Use a custom permissions
+file when the user needs narrower or different limits.
+
+Only `mainnet` is enabled for now. Do not use `--network testnet`; the CLI
+rejects it until the testnet wallet path is available.
+
 ## Inspect The Active Wallet
 
 ```bash
-mega wallet whoami --network testnet --json
-mega wallet keys --network testnet --json
+wallet whoami --json
+wallet keys --json
 ```
 
 Use these before writes to verify the account, delegated access address, expiry,
@@ -45,8 +56,7 @@ network, and approved permission limits.
 ## Read State
 
 ```bash
-mega wallet call \
-  --network testnet \
+wallet call \
   --to 0x1234567890abcdef1234567890abcdef12345678 \
   --data 0x
 ```
@@ -56,8 +66,7 @@ mega wallet call \
 ## Execute Writes
 
 ```bash
-mega wallet execute \
-  --network testnet \
+wallet execute \
   --to 0x1234567890abcdef1234567890abcdef12345678 \
   --data 0x \
   --value 0
@@ -71,14 +80,13 @@ operation fits the approved delegated-key permissions before executing.
 Native ETH:
 
 ```bash
-mega wallet transfer --network testnet --to 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd --amount 0.1
+wallet transfer --to 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd --amount 0.1
 ```
 
 ERC20:
 
 ```bash
-mega wallet transfer \
-  --network testnet \
+wallet transfer \
   --token 0x1234567890abcdef1234567890abcdef12345678 \
   --to 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd \
   --amount 100 \
@@ -90,7 +98,7 @@ mega wallet transfer \
 ## Logout
 
 ```bash
-mega wallet logout --network testnet
+wallet logout
 ```
 
 Logout removes the local profile only. It does not revoke the delegated key

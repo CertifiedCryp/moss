@@ -20,6 +20,10 @@ export type ResolvePermissionsOptions = {
 };
 
 const defaultPermissionTtlSeconds = 30 * 24 * 60 * 60;
+const defaultFeeTokenLimit = "0.01";
+const defaultNativeSpendLimit = "10000000000000000";
+const defaultUsdmSpendLimit = "20000000000000000000";
+const mainnetUsdmAddress = "0xfafddbb3fc7688494971a79cc65dca3ef82079e7";
 const periods = new Set(["minute", "hour", "day", "week", "month", "year"]);
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
 
@@ -53,12 +57,22 @@ export function defaultLoginPermissions(
   return {
     expiry: Math.floor(now.getTime() / 1000) + defaultPermissionTtlSeconds,
     feeToken: {
-      limit: "0",
+      limit: defaultFeeTokenLimit,
       symbol: "ETH",
     },
     permissions: {
       calls: [],
-      spend: [],
+      spend: [
+        {
+          limit: defaultNativeSpendLimit,
+          period: "day",
+        },
+        {
+          limit: defaultUsdmSpendLimit,
+          period: "day",
+          token: mainnetUsdmAddress,
+        },
+      ],
     },
   };
 }
@@ -87,7 +101,7 @@ export function parsePermissionRequest(value: unknown): CliPermissionRequest {
     throw new CliError("permissions feeToken must be an object");
   }
 
-  const feeLimit = normalizeIntegerString(
+  const feeLimit = normalizeDecimalString(
     value.feeToken.limit,
     "permissions feeToken.limit is required",
   );
@@ -235,6 +249,22 @@ function normalizeIntegerString(value: unknown, message: string): string {
 
   if (typeof value === "string" && /^\d+$/.test(value)) {
     return value;
+  }
+
+  throw new CliError(message);
+}
+
+function normalizeDecimalString(value: unknown, message: string): string {
+  if (typeof value === "bigint") {
+    if (value < 0n) {
+      throw new CliError(message);
+    }
+    return value.toString();
+  }
+
+  const normalized = typeof value === "number" ? value.toString() : value;
+  if (typeof normalized === "string" && /^\d+(\.\d+)?$/.test(normalized)) {
+    return normalized;
   }
 
   throw new CliError(message);

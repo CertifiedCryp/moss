@@ -6,7 +6,14 @@ import {
   registerTransferCommand,
   type TransferCommandDependencies,
 } from "./transfer.js";
-import { getChainConfig, isNetwork, type Network } from "../config/chains.js";
+import {
+  defaultNetwork,
+  getChainConfig,
+  isNetwork,
+  isSupportedNetwork,
+  type Network,
+  unsupportedNetworkMessage,
+} from "../config/chains.js";
 import {
   deleteWalletProfile,
   readWalletProfile,
@@ -80,10 +87,17 @@ export function registerWalletCommands(
     .command("wallet")
     .description("Manage MegaETH wallet workflows");
 
+  registerWalletSubcommands(wallet, dependencies);
+}
+
+export function registerWalletSubcommands(
+  wallet: Command,
+  dependencies: WalletCommandDependencies = {},
+): void {
   wallet
     .command("login")
     .description("Authorize a local delegated key with the MegaETH wallet")
-    .option("--network <network>", "wallet network", "testnet")
+    .option("--network <network>", "wallet network", defaultNetwork)
     .option("--wallet-url <url>", "wallet UI URL")
     .option("--relay-url <url>", "MegaETH relay URL")
     .option(
@@ -112,7 +126,7 @@ export function registerWalletCommands(
   wallet
     .command("whoami")
     .description("Show the active wallet account and delegated key")
-    .option("--network <network>", "wallet network", "testnet")
+    .option("--network <network>", "wallet network", defaultNetwork)
     .option("--json", "render JSON output")
     .option("-t, --terse", "render compact text output")
     .action(async (options: StatusCommandOptions) => {
@@ -122,7 +136,7 @@ export function registerWalletCommands(
   wallet
     .command("keys")
     .description("List locally known delegated keys")
-    .option("--network <network>", "wallet network", "testnet")
+    .option("--network <network>", "wallet network", defaultNetwork)
     .option("--json", "render JSON output")
     .option("-t, --terse", "render compact text output")
     .action(async (options: StatusCommandOptions) => {
@@ -132,7 +146,7 @@ export function registerWalletCommands(
   wallet
     .command("logout")
     .description("Remove the local wallet profile")
-    .option("--network <network>", "wallet network", "testnet")
+    .option("--network <network>", "wallet network", defaultNetwork)
     .option("--json", "render JSON output")
     .option("-t, --terse", "render compact text output")
     .action(async (options: StatusCommandOptions) => {
@@ -396,9 +410,12 @@ function buildStatusResult(
 }
 
 function parseNetwork(value: string | undefined): Network {
-  const network = value ?? "testnet";
+  const network = value ?? defaultNetwork;
   if (!isNetwork(network)) {
     throw new CliError(`unsupported network: ${network}`);
+  }
+  if (!isSupportedNetwork(network)) {
+    throw new CliError(unsupportedNetworkMessage(network));
   }
 
   return network;

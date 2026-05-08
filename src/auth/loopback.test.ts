@@ -9,6 +9,7 @@ import {
   readWalletProfile,
   type AuthorizedKey,
 } from "../config/profile.js";
+import { getChainConfig } from "../config/chains.js";
 import {
   buildCliAuthUrl,
   deriveDelegatedKeyPair,
@@ -69,7 +70,24 @@ describe("loopback login", () => {
       ),
     ) as ReturnType<typeof defaultLoginPermissions>;
     expect(decodedPermissions.expiry).toBe(1_780_704_000);
-    expect(decodedPermissions.permissions).toEqual({ calls: [], spend: [] });
+    expect(decodedPermissions.feeToken).toEqual({
+      limit: "0.01",
+      symbol: "ETH",
+    });
+    expect(decodedPermissions.permissions).toEqual({
+      calls: [],
+      spend: [
+        {
+          limit: "10000000000000000",
+          period: "day",
+        },
+        {
+          limit: "20000000000000000000",
+          period: "day",
+          token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
+        },
+      ],
+    });
   });
 
   it("derives Ethereum secp256k1 addresses using Keccak-256", () => {
@@ -129,6 +147,49 @@ describe("loopback login", () => {
     await expect(profileExists("mainnet", env)).resolves.toBe(false);
 
     await expect(fetch(callbackUrl!)).rejects.toThrow();
+  });
+
+  it("defaults mainnet login to the canonical wallet UI and relay", async () => {
+    const env = await tempEnv();
+    const keyPair = deriveDelegatedKeyPair(testPrivateKey);
+    const chainConfig = getChainConfig("mainnet");
+
+    const result = await runLoopbackLogin({
+      network: "mainnet",
+      privateKey: testPrivateKey,
+      state: testState,
+      permissionRequest: defaultLoginPermissions(
+        new Date("2026-05-07T00:00:00.000Z"),
+      ),
+      env,
+      now: new Date("2026-05-07T00:00:00.000Z"),
+      timeoutMs: 1_000,
+      openBrowser: async (authUrl) => {
+        const url = new URL(authUrl);
+        expect(url.origin).toBe(chainConfig.walletUrl);
+
+        const response = await fetch(
+          buildCallbackUrl(
+            url.searchParams.get("redirectUri") as LoopbackRedirectUri,
+            {
+              state: url.searchParams.get("state")!,
+              status: "approved",
+              accountAddress: "0x1111111111111111111111111111111111111111",
+              accessAddress: keyPair.accessAddress,
+              authorizedKey: makeAuthorizedKey(keyPair.publicKey),
+            },
+          ),
+        );
+        expect(response.status).toBe(200);
+      },
+    });
+
+    expect(result.profile.walletUrl).toBe(chainConfig.walletUrl);
+    expect(result.profile.relayUrl).toBe(chainConfig.relayUrl);
+    await expect(readWalletProfile("mainnet", env)).resolves.toMatchObject({
+      walletUrl: "https://account.megaeth.com",
+      relayUrl: "https://wallet-relay.megaeth.com",
+    });
   });
 
   it("rejects state mismatch without writing a profile", async () => {

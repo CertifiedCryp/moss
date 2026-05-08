@@ -33,9 +33,17 @@ describe("wallet status commands", () => {
     const env = await tempEnv();
 
     await expect(
+      runWalletWhoami({ network: "mainnet" }, { env, stdout: memoryOutput() }),
+    ).rejects.toThrow("no mainnet wallet profile found; run wallet login");
+  });
+
+  it("rejects testnet before reading wallet profiles", async () => {
+    const env = await tempEnv();
+
+    await expect(
       runWalletWhoami({ network: "testnet" }, { env, stdout: memoryOutput() }),
     ).rejects.toThrow(
-      "no testnet wallet profile found; run mega wallet login --network testnet",
+      "testnet is not supported yet. Omit --network to use mainnet until the wallet path is available.",
     );
   });
 
@@ -46,7 +54,7 @@ describe("wallet status commands", () => {
     await writeWalletProfile(profile, env);
 
     const result = await runWalletWhoami(
-      { network: "testnet" },
+      { network: "mainnet" },
       { env, now: () => expiredNow, stdout },
     );
 
@@ -65,7 +73,7 @@ describe("wallet status commands", () => {
     await writeWalletProfile(profile, env);
 
     await runWalletWhoami(
-      { json: true, network: "testnet" },
+      { json: true, network: "mainnet" },
       { env, now: () => activeNow, stdout },
     );
 
@@ -76,7 +84,7 @@ describe("wallet status commands", () => {
       accessAddress: profile.accessAddress,
       accountAddress: profile.accountAddress,
       expired: false,
-      network: "testnet",
+      network: "mainnet",
     });
   });
 
@@ -87,12 +95,12 @@ describe("wallet status commands", () => {
     await writeWalletProfile(profile, env);
 
     const result = await runWalletKeys(
-      { network: "testnet" },
+      { network: "mainnet" },
       { env, now: () => activeNow, stdout },
     );
 
     expect(result.keys).toHaveLength(1);
-    expect(stdout.text).toContain("Delegated keys for testnet:");
+    expect(stdout.text).toContain("Delegated keys for mainnet:");
     expect(stdout.text).toContain("transfer(address,uint256)");
     expect(stdout.text).toContain("Spend: 100000000000000000/day");
     expect(stdout.text).toContain("Fee token: 1000000000000000 ETH");
@@ -106,20 +114,20 @@ describe("wallet status commands", () => {
     await writeWalletProfile(profile, env);
 
     const result = await runWalletLogout(
-      { network: "testnet", terse: true },
+      { network: "mainnet", terse: true },
       { env, stdout },
     );
 
     expect(result).toEqual({
       accessAddress: profile.accessAddress,
       accountAddress: profile.accountAddress,
-      network: "testnet",
+      network: "mainnet",
       removed: true,
     });
-    expect(stdout.text).toBe(`testnet\tremoved\t${profile.accessAddress}\n`);
-    await expect(profileExists("testnet", env)).resolves.toBe(false);
-    await expect(readWalletProfile("testnet", env)).rejects.toThrow(
-      "run mega wallet login",
+    expect(stdout.text).toBe(`mainnet\tremoved\t${profile.accessAddress}\n`);
+    await expect(profileExists("mainnet", env)).resolves.toBe(false);
+    await expect(readWalletProfile("mainnet", env)).rejects.toThrow(
+      "run wallet login",
     );
   });
 
@@ -143,12 +151,12 @@ describe("wallet status commands", () => {
       "wallet",
       "whoami",
       "--network",
-      "testnet",
+      "mainnet",
       "-t",
     ]);
 
     expect(stdout.text).toBe(
-      `testnet\t${profile.accountAddress}\t${profile.accessAddress}\tactive\t${profile.authorizedKey.expiry}\n`,
+      `mainnet\t${profile.accountAddress}\t${profile.accessAddress}\tactive\t${profile.authorizedKey.expiry}\n`,
     );
   });
 });
@@ -163,7 +171,7 @@ async function tempEnv(): Promise<NodeJS.ProcessEnv> {
 function makeProfile(options: { expiry?: number } = {}): WalletProfile {
   return {
     version: 1,
-    network: "testnet",
+    network: "mainnet",
     accountAddress: "0x1111111111111111111111111111111111111111",
     accessAddress: "0x2222222222222222222222222222222222222222",
     privateKey:
