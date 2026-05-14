@@ -31,8 +31,8 @@ the inner `permissions` object:
         "signature": "approve(address,uint256)"
       },
       {
-        "to": "0x7e324AbC5De01d112AfC03a584966ff199741C28",
-        "signature": "supply(address,uint256,address,uint16)"
+        "to": "0x1234567890abcdef1234567890abcdef12345678",
+        "signature": "deposit(uint256)"
       }
     ],
     "spend": [
@@ -63,17 +63,18 @@ the inner `permissions` object:
   enforcement.
 - Use `permissions.calls: []` only when the key should have no executable
   contract call scope. A key with spend allowance but `calls: []` cannot perform
-  useful ERC20, swap, Aave, or other contract-write actions because those all
-  require contract calls.
+  useful ERC20, swap, lending, or other contract-write actions because those
+  all require contract calls.
 - Omitted `permissions.calls` is legacy/default shorthand that the wallet may
   present as broad call authority. Do not rely on omission in hand-authored
   permission files; use `calls: [{}]` for broad authority.
 - A call entry may specify `to`, `signature`, or both. `signature` may be a
   function signature like `transfer(address,uint256)` or a 4-byte selector.
 
-## Aave Supply
+## Multi-Contract Writes
 
-Aave supply-style interactions need both spend permission for the supplied token
-and call permission for ERC20 `approve` plus Aave pool `supply`. A key with
+Workflows that move ERC20 value through another contract usually need both
+spend permission for the token and call permission for each function they
+invoke, such as ERC20 `approve` plus the downstream protocol call. A key with
 sufficient spend but `permissions.calls: []` will still fail with
 `UnauthorizedCall`.

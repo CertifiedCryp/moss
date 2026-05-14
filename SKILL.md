@@ -30,21 +30,15 @@ wallet account.
 
 ## Setup
 
-If `mega wallet --help` is unavailable and the wallet CLI checkout is present,
-install the local CLI and this skill from the repo root:
+If `mega wallet --help` is unavailable, install the wallet CLI with the public
+installer:
 
 ```bash
-./scripts/install.sh
+curl -fsSL https://account.megaeth.com/install | sh
 ```
 
-For Claude support too, install the skill into both agent homes:
-
-```bash
-./scripts/install.sh --skill-agent all
-```
-
-After installing or updating a skill, restart the target agent process so it can
-load the new instructions.
+After install, make sure the install directory printed by the installer is on
+`PATH`, then rerun `mega wallet --help`.
 
 ## Safety Rules
 
@@ -178,25 +172,25 @@ non-default stored key. Confirm that the requested operation fits the approved
 delegated-key permissions before executing.
 
 Spend permission is not call permission. A restrictive key with `calls: []`
-cannot call `approve`, `transfer`, Aave `supply`, or other contract functions
-even when it has token spend allowance. If the relay returns
+cannot call `approve`, `transfer`, swaps, lending deposits, or other contract
+functions even when it has token spend allowance. If the relay returns
 `UnauthorizedCall`, inspect the target/function selector and create or switch to
 a key with matching `--allow-call` scopes.
 
 For custom permission files, use `permissions.calls: [{}]` for broad contract
 call authority and `permissions.calls: []` only for an intentionally no-call key.
 
-For Aave supply-style interactions, the key needs both spend permission for the
-token being supplied and call permission for the ERC20 `approve` plus the Aave
-pool `supply` call.
+For workflows that move ERC20 value through another contract, the key usually
+needs both spend permission for the token and call permission for each contract
+function it invokes, such as ERC20 `approve` plus the downstream protocol call.
 
-Example Aave USDM deposit call scopes on top of the default spend request:
+Example custom call scopes on top of the default spend request:
 
 ```bash
 mega wallet create-key \
   --spend-limit 100 \
   --allow-call '0xfafddbb3fc7688494971a79cc65dca3ef82079e7:approve(address,uint256)' \
-  --allow-call '0x7e324AbC5De01d112AfC03a584966ff199741C28:supply(address,uint256,address,uint16)'
+  --allow-call '0x1234567890abcdef1234567890abcdef12345678:deposit(uint256)'
 ```
 
 ## Transfer Funds
