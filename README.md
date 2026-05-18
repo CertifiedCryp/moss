@@ -190,10 +190,10 @@ For a selected stored key:
 mega wallet execute --key 0xKEY_OR_ACCESS_ADDRESS --calls ./calls.json
 ```
 
-Spend permission is not call permission. A key with token spend allowance but
-`permissions.calls: []` cannot execute ERC20 transfers, approvals, swaps, or
-other contract writes. Inspect permissions before writes and create a new key
-with the needed call scopes when the relay reports `UnauthorizedCall`.
+Spend permission is not call permission. Empty call permissions create keys
+that cannot execute relay-backed writes, including native ETH transfers. Custom
+permission files with `permissions.calls: []` are rejected; use
+`permissions.calls: [{}]` for broad authority or include explicit call scopes.
 
 ## Transfers
 

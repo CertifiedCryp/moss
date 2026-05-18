@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -340,6 +340,36 @@ describe("loopback login", () => {
       },
     ]);
     expect(permissions.permissions.calls).toEqual([{}]);
+  });
+
+  it("rejects custom permission files with empty call permissions", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mega-wallet-cli-permissions-"));
+    tempDirs.push(dir);
+    const permissionsFile = join(dir, "permissions.json");
+    await writeFile(
+      permissionsFile,
+      JSON.stringify({
+        expiry: 1_800_000_000,
+        feeToken: {
+          limit: "1",
+          symbol: "USDM",
+        },
+        permissions: {
+          calls: [],
+          spend: [
+            {
+              limit: "1000000000000000",
+              period: "week",
+            },
+          ],
+        },
+      }),
+      "utf8",
+    );
+
+    await expect(resolveLoginPermissions({ permissionsFile })).rejects.toThrow(
+      "permissions.calls must include at least one call",
+    );
   });
 
   it("uses the testnet USDM token for testnet default permissions", async () => {

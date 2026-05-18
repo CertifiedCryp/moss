@@ -25,6 +25,7 @@ import {
   type BrowserOpener,
 } from "../auth/loopback.js";
 import {
+  assertExecutableCallPermission,
   defaultLoginPermissions,
   resolveLoginPermissions,
   type CliPermissionRequest,
@@ -1028,11 +1029,13 @@ async function resolveCreateKeyPermissions(
     const source = requireWalletKey(profile, options.from);
     const fallback = defaultLoginPermissions(now, { network });
 
-    return {
+    const request = {
       expiry: fallback.expiry,
       feeToken: source.authorizedKey.feeToken ?? fallback.feeToken,
       permissions: source.authorizedKey.permissions,
     };
+    assertExecutableCallPermission(request);
+    return request;
   }
 
   return resolveLoginPermissions({

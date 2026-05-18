@@ -68,10 +68,9 @@ the inner `permissions` object:
 - Use `permissions.calls: [{}]` for broad contract call authority: any target
   and any function, still bounded by spend, fee, expiry, relay, and account
   enforcement.
-- Use `permissions.calls: []` only when the key should have no executable
-  contract call scope. A key with spend allowance but `calls: []` cannot perform
-  useful ERC20, swap, lending, or other contract-write actions because those
-  all require contract calls.
+- Do not use `permissions.calls: []`. Empty call permissions cannot execute
+  relay-backed writes, including native ETH transfers, and the CLI rejects them
+  in custom permission request files.
 - Omitted `permissions.calls` is legacy/default shorthand that the wallet may
   present as broad call authority. Do not rely on omission in hand-authored
   permission files; use `calls: [{}]` for broad authority.
@@ -87,5 +86,4 @@ the inner `permissions` object:
 Workflows that move ERC20 value through another contract usually need both
 spend permission for the token and call permission for each function they
 invoke, such as ERC20 `approve` plus the downstream protocol call. A key with
-sufficient spend but `permissions.calls: []` will still fail with
-`UnauthorizedCall`.
+sufficient spend but no call permission will still fail with `UnauthorizedCall`.

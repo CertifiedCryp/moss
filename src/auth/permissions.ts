@@ -61,6 +61,7 @@ export async function resolveLoginPermissions(
 
   const allowCalls = options.allowCalls ?? [];
   if (allowCalls.length === 0) {
+    assertExecutableCallPermission(request);
     return request;
   }
 
@@ -69,13 +70,16 @@ export async function resolveLoginPermissions(
       ? []
       : (request.permissions.calls ?? []);
 
-  return {
+  const merged = {
     ...request,
     permissions: {
       ...request.permissions,
       calls: [...existingCalls, ...allowCalls.map(parseAllowCall)],
     },
   };
+
+  assertExecutableCallPermission(merged);
+  return merged;
 }
 
 export function defaultLoginPermissions(
@@ -108,6 +112,19 @@ export function encodePermissions(request: CliPermissionRequest): string {
     JSON.stringify(parsePermissionRequest(request)),
     "utf8",
   ).toString("base64url");
+}
+
+export function assertExecutableCallPermission(
+  request: CliPermissionRequest,
+): void {
+  if (
+    request.permissions.calls !== undefined &&
+    request.permissions.calls.length === 0
+  ) {
+    throw new CliError(
+      "permissions.calls must include at least one call permission; relay-backed wallet writes require contract call permission. Use permissions.calls: [{}] for broad contract authority or add explicit call scopes.",
+    );
+  }
 }
 
 export function parsePermissionRequest(value: unknown): CliPermissionRequest {

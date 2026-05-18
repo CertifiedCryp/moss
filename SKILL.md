@@ -66,6 +66,12 @@ The CLI opens MegaETH Wallet in the system browser, listens on
 delegated-key profile locally. The callback must not contain private keys or
 transferable bearer credentials.
 
+`--auth-flow` selects the authorization protocol. `--no-browser` only prevents
+the CLI from opening the browser automatically and prints the authorization URL
+instead. For example, `mega wallet login --no-browser` still uses same-machine
+loopback auth; use `--auth-flow device` when the browser is not on the CLI
+machine.
+
 For headless, SSH, container, or remote CLI environments, use device-style auth:
 
 ```bash
@@ -177,14 +183,14 @@ For multiple writes, pass `--calls ./calls.json`. Pass
 non-default stored key. Confirm that the requested operation fits the approved
 delegated-key permissions before executing.
 
-Spend permission is not call permission. A restrictive key with `calls: []`
-cannot call `approve`, `transfer`, swaps, lending deposits, or other contract
-functions even when it has token spend allowance. If the relay returns
-`UnauthorizedCall`, inspect the target/function selector and create or switch to
-a key with matching `--allow-call` scopes.
+Spend permission is not call permission. A key with `calls: []` cannot execute
+relay-backed writes, including native ETH transfers, even when it has spend
+allowance. Do not request `calls: []`; use `permissions.calls: [{}]` for broad
+contract authority or explicit `--allow-call` scopes for restrictive keys.
 
 For custom permission files, use `permissions.calls: [{}]` for broad contract
-call authority and `permissions.calls: []` only for an intentionally no-call key.
+call authority. The CLI rejects `permissions.calls: []` permission requests
+because they produce unusable write keys.
 
 For workflows that move ERC20 value through another contract, the key usually
 needs both spend permission for the token and call permission for each contract
