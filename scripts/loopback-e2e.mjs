@@ -652,7 +652,10 @@ async function handleShimRequest(
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/v1/partners") {
+  if (
+    request.method === "GET" &&
+    (url.pathname === "/v1/apps" || url.pathname === "/v1/partners")
+  ) {
     const origin = url.searchParams.get("origin") ?? "localhost:4000";
     json(response, request, 200, {
       id: "mega-cli-local",
@@ -762,7 +765,10 @@ async function handleShimRequest(
 
   if (
     request.method === "PUT" &&
-    (url.pathname === "/v1/activity/partner-connect" ||
+    (url.pathname === "/v1/activity/app-connect" ||
+      url.pathname === "/v1/activity/app-session" ||
+      url.pathname === "/v1/activity/app-contract" ||
+      url.pathname === "/v1/activity/partner-connect" ||
       url.pathname === "/v1/activity/partner-session")
   ) {
     await readJson(request);

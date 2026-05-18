@@ -377,8 +377,14 @@ async function main() {
 
 async function runWriteTests(profile, fixtures) {
   await test("profile has call scopes required for write regression tests", () => {
+    const authorizedKey =
+      profile.activeKey?.authorizedKey ?? profile.authorizedKey;
+    assert(
+      authorizedKey?.permissions?.calls,
+      "active profile is missing authorized key call permissions",
+    );
     const scopes = new Set(
-      profile.authorizedKey.permissions.calls.map(
+      authorizedKey.permissions.calls.map(
         (call) => `${call.to.toLowerCase()}:${call.signature}`,
       ),
     );
@@ -696,6 +702,8 @@ function parseArgs(args) {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
+      case "--":
+        break;
       case "--amount":
         parsed.amount = readValue(args, ++index, arg);
         break;
