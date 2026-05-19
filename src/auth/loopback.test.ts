@@ -79,7 +79,7 @@ describe("loopback login", () => {
       spend: [
         {
           limit: "100000000000000000000",
-          period: "year",
+          period: "week",
           token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
         },
       ],
@@ -132,6 +132,9 @@ describe("loopback login", () => {
 
         const response = await fetch(callbackUrl);
         expect(response.status).toBe(200);
+        await expect(response.text()).resolves.toContain(
+          "Authorization successful. You can close this browser window.",
+        );
       },
     });
 
@@ -278,6 +281,9 @@ describe("loopback login", () => {
 
           const response = await fetch(callbackUrl);
           expect(response.status).toBe(200);
+          await expect(response.text()).resolves.toContain(
+            "Authorization cancelled. You can close this browser window.",
+          );
         },
       }),
     ).rejects.toThrow("wallet authorization was cancelled");
@@ -335,7 +341,7 @@ describe("loopback login", () => {
     expect(permissions.permissions.spend).toEqual([
       {
         limit: "12500000000000000000",
-        period: "year",
+        period: "week",
         token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
       },
     ]);
@@ -382,7 +388,7 @@ describe("loopback login", () => {
     expect(permissions.permissions.spend).toEqual([
       {
         limit: "12500000000000000000",
-        period: "year",
+        period: "week",
         token: "0x15e9f2b0a747ac05c7446559306687085d161e5c",
       },
     ]);

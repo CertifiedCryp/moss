@@ -778,19 +778,19 @@ function handleCallbackRequest(
       sendText(
         response,
         200,
-        "Mega CLI authorization approved. You can close this tab.",
+        "Authorization successful. You can close this browser window.",
       );
     } else if (callback.status === "cancelled") {
       sendText(
         response,
         200,
-        "Mega CLI authorization cancelled. You can close this tab.",
+        "Authorization cancelled. You can close this browser window.",
       );
     } else {
       sendText(
         response,
         400,
-        "Mega CLI authorization failed. You can close this tab.",
+        "Authorization failed. You can close this browser window.",
       );
     }
     settle(callback);

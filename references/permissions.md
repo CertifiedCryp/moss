@@ -46,7 +46,7 @@ the inner `permissions` object:
       {
         "token": "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
         "limit": "100000000000000000000",
-        "period": "year"
+        "period": "week"
       }
     ]
   }

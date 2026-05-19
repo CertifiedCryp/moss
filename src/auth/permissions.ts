@@ -98,7 +98,7 @@ export function defaultLoginPermissions(
       spend: [
         {
           limit: normalizeDefaultUsdmSpendLimit(options.spendLimit),
-          period: "year",
+          period: "week",
           token: chainConfig.defaultFeeToken.address,
         },
       ],

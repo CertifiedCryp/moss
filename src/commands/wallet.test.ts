@@ -288,7 +288,7 @@ describe("wallet status commands", () => {
         expect(options.permissionRequest.permissions.spend).toEqual([
           {
             limit: "12500000000000000000",
-            period: "year",
+            period: "week",
             token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
           },
         ]);
@@ -348,7 +348,7 @@ describe("wallet status commands", () => {
         expect(options.permissionRequest.permissions.spend).toEqual([
           {
             limit: "25000000000000000000",
-            period: "year",
+            period: "week",
             token: "0x15e9f2b0a747ac05c7446559306687085d161e5c",
           },
         ]);
