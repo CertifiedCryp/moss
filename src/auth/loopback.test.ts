@@ -374,7 +374,36 @@ describe("loopback login", () => {
     );
 
     await expect(resolveLoginPermissions({ permissionsFile })).rejects.toThrow(
-      "permissions.calls must include at least one call",
+      "permissions.calls must be present and include at least one call",
+    );
+  });
+
+  it("rejects custom permission files with omitted call permissions", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mega-wallet-cli-permissions-"));
+    tempDirs.push(dir);
+    const permissionsFile = join(dir, "permissions.json");
+    await writeFile(
+      permissionsFile,
+      JSON.stringify({
+        expiry: 1_800_000_000,
+        feeToken: {
+          limit: "1",
+          symbol: "USDM",
+        },
+        permissions: {
+          spend: [
+            {
+              limit: "1000000000000000",
+              period: "week",
+            },
+          ],
+        },
+      }),
+      "utf8",
+    );
+
+    await expect(resolveLoginPermissions({ permissionsFile })).rejects.toThrow(
+      "permissions.calls must be present and be an array",
     );
   });
 

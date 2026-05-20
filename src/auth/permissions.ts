@@ -117,11 +117,11 @@ export function assertExecutableCallPermission(
   request: CliPermissionRequest,
 ): void {
   if (
-    request.permissions.calls !== undefined &&
+    request.permissions.calls === undefined ||
     request.permissions.calls.length === 0
   ) {
     throw new CliError(
-      "permissions.calls must include at least one call permission; relay-backed wallet writes require contract call permission. Use permissions.calls: [{}] for broad contract authority or add explicit call scopes.",
+      "permissions.calls must be present and include at least one call permission; relay-backed wallet writes require contract call permission. Use permissions.calls: [{}] for broad contract authority or add explicit call scopes.",
     );
   }
 }
@@ -195,8 +195,8 @@ export function parsePermissionScope(
     throw new CliError("permissions scope must be an object");
   }
 
-  if (value.calls !== undefined && !Array.isArray(value.calls)) {
-    throw new CliError("permissions calls must be an array");
+  if (!Array.isArray(value.calls)) {
+    throw new CliError("permissions.calls must be present and be an array");
   }
 
   if (!Array.isArray(value.spend)) {
@@ -204,11 +204,9 @@ export function parsePermissionScope(
   }
 
   const permissions: AuthorizedKey["permissions"] = {
+    calls: value.calls.map(parseCallPermission),
     spend: value.spend.map(parseSpendPermission),
   };
-  if (value.calls !== undefined) {
-    permissions.calls = value.calls.map(parseCallPermission);
-  }
 
   return permissions;
 }

@@ -66,16 +66,16 @@ the inner `permissions` object:
 - Spend `period` must be `minute`, `hour`, `day`, `week`, `month`, or `year`.
 - Omit `token` for native ETH spend. Use a 20-byte token address for ERC20
   spend.
-- Prefer including `permissions.calls` explicitly in custom files.
+- `permissions.calls` is required and must contain at least one entry.
 - Use `permissions.calls: [{}]` for broad contract call authority: any target
   and any function, still bounded by spend, fee, expiry, relay, and account
   enforcement.
 - Do not use `permissions.calls: []`. Empty call permissions cannot execute
   relay-backed writes, including native ETH transfers, and the CLI rejects them
   in custom permission request files.
-- Omitted `permissions.calls` is legacy/default shorthand that the wallet may
-  present as broad call authority. Do not rely on omission in hand-authored
-  permission files; use `calls: [{}]` for broad authority.
+- Do not omit `permissions.calls`. Omitted call permissions have produced
+  approvals that look funded but are rejected by the relay for writes; the CLI
+  rejects them in custom permission request files.
 - A call entry may specify `to`, `signature`, or both. Prefer human-readable
   function signatures, such as `transfer(address,uint256)` or
   `supply(address,uint256,address,uint16)`, over 4-byte hex selectors.

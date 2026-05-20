@@ -1845,7 +1845,7 @@ async function runKeyManagementE2E(page, runOptions, initialProfile) {
       { env, stdout },
     ),
   );
-  assertIncludes(permissions.stdout, "Can spend up to 100 USDM per week");
+  assertIncludes(permissions.stdout, "Can spend up to 100 USDm per week");
 
   await withOutput((stdout) =>
     walletCommands.runWalletLabel(

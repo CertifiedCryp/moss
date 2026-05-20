@@ -49,7 +49,7 @@ function summarizeCalls(
   callPermissions: AuthorizedKey["permissions"]["calls"],
 ): string[] {
   if (callPermissions === undefined) {
-    return ["Can call any contract/function"];
+    return ["No explicit contract call permission"];
   }
 
   if (callPermissions.length === 0) {

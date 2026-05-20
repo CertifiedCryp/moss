@@ -110,6 +110,9 @@ permissions file when a more restrictive protocol-specific key is required. For
 additional keys, use `mega wallet create-key --spend-limit <amount>` to
 override the default USDM spend cap. Use `--permissions ./permissions.json` to
 change fee token, call scope, expiry, spend token, or spend period.
+Custom permission files must include a non-empty `permissions.calls` array.
+Never omit `permissions.calls`; omitted calls have produced keys that the relay
+rejects for writes.
 
 Fee limits are token-denominated. The CLI does not implement `maxFeesUSD`; use
 `feeToken.limit` for the amount of `feeToken.symbol` the key may spend on relay
@@ -187,14 +190,15 @@ For multiple writes, pass `--calls ./calls.json`. Pass
 non-default stored key. Confirm that the requested operation fits the approved
 delegated-key permissions before executing.
 
-Spend permission is not call permission. A key with `calls: []` cannot execute
-relay-backed writes, including native ETH transfers, even when it has spend
-allowance. Do not request `calls: []`; use `permissions.calls: [{}]` for broad
-contract authority or explicit `--allow-call` scopes for restrictive keys.
+Spend permission is not call permission. A key with `calls: []` or omitted
+`permissions.calls` cannot execute relay-backed writes, including native ETH
+transfers, even when it has spend allowance. Do not request `calls: []` and do
+not omit `permissions.calls`; use `permissions.calls: [{}]` for broad contract
+authority or explicit `--allow-call` scopes for restrictive keys.
 
 For custom permission files, use `permissions.calls: [{}]` for broad contract
-call authority. The CLI rejects `permissions.calls: []` permission requests
-because they produce unusable write keys.
+call authority. The CLI rejects omitted or empty `permissions.calls` permission
+requests because they produce unusable write keys.
 
 For workflows that move ERC20 value through another contract, the key usually
 needs both spend permission for the token and call permission for each contract

@@ -142,9 +142,10 @@ Be precise about empty fields versus omitted fields:
   protocol, or other contract-write actions because those all require contract
   calls.
 - `permissions.spend: []` means no explicit asset spend scopes were requested.
-- Omitted `calls` / `spend` can have different Porto defaults. Do not rely on
-  accidental omission semantics in hand-authored permission files. If broad call
-  authority is desired, encode it intentionally as `permissions.calls: [{}]`,
+- Omitted `permissions.calls` is not broad call authority in relay execution.
+  It has produced approvals that look funded but fail writes with delegated-key
+  permission errors. Reject omitted `permissions.calls` in CLI/auth request
+  files; encode broad call authority intentionally as `permissions.calls: [{}]`,
   document it, and cover it with tests.
 
 `permissions.calls` scopes which target/function selectors the key may execute.
@@ -171,12 +172,12 @@ layer. Be careful when changing defaults or copy around this.
 The agent-oriented default keeps the visible approval simple: one-week expiry,
 network-specific USDM as the fee token with a `1 USDM` allowance, and a flat
 `100 USDM` spend cap for the authorization window. Approved broad-call keys must
-be represented as `permissions.calls: [{}]`. Use `permissions.calls: []` only
-when the key should have no app-level call scopes, or provide explicit call
-scopes when a more restrictive key is required. Keep those caps and call-scope
-requirements explicit in prompt/UI copy, avoid ambiguous empty or omitted
-permissions, and update `README.md`, `SKILL.md`, tests, and this file together
-when changing the default.
+be represented as `permissions.calls: [{}]`. Do not create CLI write keys with
+omitted or empty `permissions.calls`; provide explicit call scopes when a more
+restrictive key is required. Keep those caps and call-scope requirements
+explicit in prompt/UI copy, avoid ambiguous empty or omitted permissions, and
+update `README.md`, `SKILL.md`, tests, and this file together when changing the
+default.
 
 `mega wallet create-key --spend-limit <amount>` is a shorthand for overriding
 the default network-specific USDM spend cap on the new key request. It accepts a
