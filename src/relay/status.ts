@@ -48,6 +48,10 @@ export async function getRelayCallsStatus(
   id: HexString,
   actions: PortoRelayActions = portoRelayActions,
 ): Promise<RelayCallsStatus> {
+  if (actions.getCallsStatus === undefined) {
+    throw new CliError("relay getCallsStatus is not available");
+  }
+
   return actions.getCallsStatus(client, { id });
 }
 

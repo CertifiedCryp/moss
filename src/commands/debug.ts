@@ -28,6 +28,7 @@ import {
   createPortoRelayClient,
   portoRelayActions,
   relayErrorToCliError,
+  resolvePortoRelayUrl,
   type PortoRelayActions,
   type PortoRelayClient,
   type RelayAccountKey,
@@ -207,9 +208,10 @@ async function inspectDelegatedKey(
   }
 
   try {
+    const relayUrl = resolvePortoRelayUrl(profile.relayUrl, profile.network);
     const client =
-      options.createRelayClient?.(profile.relayUrl, profile.network) ??
-      createPortoRelayClient(profile.relayUrl, profile.network);
+      options.createRelayClient?.(relayUrl, profile.network) ??
+      createPortoRelayClient(relayUrl, profile.network);
     const keys = await actions.getKeys(client, {
       account: profile.accountAddress,
       chainIds: [getChainConfig(profile.network).chainId],

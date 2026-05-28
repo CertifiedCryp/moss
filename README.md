@@ -64,23 +64,10 @@ mega wallet login --network testnet
 mega wallet whoami --network testnet
 ```
 
-By default, browser authorization uses same-machine loopback. For headless,
-SSH, container, or remote environments, use the device-style flow:
-
-```bash
-mega wallet login --auth-flow device --no-browser
-```
-
-The CLI prints:
-
-```text
-Running headless? Go to https://account.megaeth.com/cli-auth and input this code - XXXX-XXXX
-```
-
-Open that URL on any browser-capable device, enter the code, approve with the
-wallet passkey, and leave the CLI running until approval completes. The PKCE
-verifier stays on the CLI machine; the browser and backend only receive public
-request/approval metadata.
+Browser authorization uses same-machine loopback. The browser and CLI process
+must run on the same machine; device-code auth is not supported right now. Use
+`--no-browser` only when you want the CLI to print the loopback authorization
+URL instead of opening it automatically.
 
 Fee allowances are token-denominated. A `maxFeesUSD` permission field is not
 implemented by the CLI; set `feeToken.limit` to the approved amount of
@@ -127,8 +114,6 @@ mega wallet create-key \
 mega wallet create-key \
   --spend-limit 25 \
   --allow-call '0xfafddbb3fc7688494971a79cc65dca3ef82079e7:transfer(address,uint256)'
-mega wallet create-key --auth-flow device --no-browser \
-  --allow-call '0xfafddbb3fc7688494971a79cc65dca3ef82079e7:transfer(address,uint256)'
 ```
 
 `create-key` requires an explicit call scope unless copying an existing key
@@ -136,8 +121,8 @@ with `--from` or using a complete `--permissions ./permissions.json` file.
 `--spend-limit` accepts a human USDM amount and preserves the default fee token,
 expiry, spend token, and spend period while the `--allow-call` flags define
 what the key can execute. See [references/permissions.md](references/permissions.md)
-for custom expiry, fee token, spend token, spend period, no-spend, broad call
-authority, or multi-contract scopes.
+for custom expiry, fee token, spend token, spend period, no-spend, custom call
+scope, or multi-contract scopes.
 
 Switch or label local keys:
 
@@ -150,7 +135,6 @@ Revoke a delegated key on-chain:
 
 ```bash
 mega wallet revoke 0xKEY_OR_ACCESS_ADDRESS
-mega wallet revoke 0xKEY_OR_ACCESS_ADDRESS --auth-flow device --no-browser
 ```
 
 `revoke` opens MegaETH Wallet for passkey confirmation. After success, the CLI

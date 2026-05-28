@@ -31,7 +31,6 @@ const walletApiUrlOverride = readOptionalEnv("MEGA_WALLET_CLI_WALLET_API_URL");
 const relayUrlOverride = readOptionalEnv("MEGA_WALLET_CLI_RELAY_URL");
 const defaultWalletUrl = "https://account.megaeth.com";
 const defaultWalletApiUrl = "https://wallet-api.megaeth.com";
-const defaultRelayUrl = "https://wallet-relay.megaeth.com";
 const nativeCurrency = {
   decimals: 18,
   name: "MegaETH Ether",
@@ -47,7 +46,7 @@ export const chainConfigs: Record<Network, ChainConfig> = {
     rpcUrl: "https://mainnet.megaeth.com/rpc",
     walletUrl: walletUrlOverride ?? defaultWalletUrl,
     walletApiUrl: walletApiUrlOverride ?? defaultWalletApiUrl,
-    relayUrl: relayUrlOverride ?? defaultRelayUrl,
+    relayUrl: relayUrlOverride ?? "https://mainnet.megaeth.com/relay",
     defaultFeeToken: {
       address: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
       decimals: 18,
@@ -62,7 +61,7 @@ export const chainConfigs: Record<Network, ChainConfig> = {
     rpcUrl: "https://carrot.megaeth.com/rpc",
     walletUrl: walletUrlOverride ?? defaultWalletUrl,
     walletApiUrl: walletApiUrlOverride ?? defaultWalletApiUrl,
-    relayUrl: relayUrlOverride ?? defaultRelayUrl,
+    relayUrl: relayUrlOverride ?? "https://carrot.megaeth.com/relay",
     defaultFeeToken: {
       address: "0x15e9f2b0a747ac05c7446559306687085d161e5c",
       decimals: 18,

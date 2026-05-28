@@ -80,10 +80,10 @@ For both browser-opened and `--no-browser` authorization flows, pass
 
 Authorization commands that use `--no-browser` are interactive waiting
 processes. Do not run them as unmonitored foreground shell commands: the printed
-URL/code can be lost while the process keeps waiting for browser approval.
+URL can be lost while the process keeps waiting for browser approval.
 Before starting `login`, `create-key`, or `revoke` with `--no-browser`, make
 sure your execution tool will stream stdout/stderr immediately and keep the
-session open for polling. Capture the printed URL/code, show it to the user, and
+session open. Capture the printed URL, show it to the user, and
 continue monitoring until the command completes, times out, or the user asks you
 to stop. If you cannot monitor live output, do not start the auth flow; tell the
 user the exact command to run locally instead.
@@ -101,7 +101,7 @@ and delegated private key material; run it only after the user explicitly
 approves reconnecting this CLI to a different wallet.
 
 Login defaults to mainnet, `https://account.megaeth.com`,
-`https://wallet-api.megaeth.com`, and `https://wallet-relay.megaeth.com`. Use
+`https://wallet-api.megaeth.com`, and `https://mainnet.megaeth.com/relay`. Use
 `--wallet-url`, `--wallet-api-url`, or `--relay-url` only when deliberately
 targeting non-canonical endpoints. Use `--network testnet` for the wallet
 testnet profile and chain config.

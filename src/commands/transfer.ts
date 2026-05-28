@@ -21,7 +21,7 @@ import {
   readErc20Metadata,
   type Erc20Metadata,
 } from "../eth/erc20.js";
-import { compactAddress, redactString, toJson } from "../output.js";
+import { compactAddress, toJson } from "../output.js";
 
 export type TransferCommandOptions = {
   amount?: string;
@@ -99,13 +99,13 @@ export function registerTransferCommand(
     .option("--rpc-url <url>", "Ethereum JSON-RPC URL for token metadata")
     .option(
       "--poll-interval-ms <ms>",
-      "relay status polling interval",
+      "deprecated; ignored for direct relay sends",
       parsePositiveInteger,
       1_000,
     )
     .option(
       "--timeout-ms <ms>",
-      "relay status polling timeout",
+      "deprecated; ignored for direct relay sends",
       parsePositiveInteger,
       120_000,
     )
@@ -250,6 +250,7 @@ function renderTransferResult(
   }
 
   const transactionHash =
+    result.transactionHash ??
     result.receipts?.[result.receipts.length - 1]?.transactionHash;
 
   if (options.terse) {
@@ -270,7 +271,6 @@ function renderTransferResult(
     `Asset: ${asset}`,
     `Amount: ${result.transfer.amount}`,
     `To: ${compactAddress(result.transfer.to)}`,
-    `Bundle: ${redactString(result.id)}`,
     `Status: ${result.status}`,
     `Network: ${result.network}`,
   ];

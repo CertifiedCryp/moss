@@ -210,7 +210,7 @@ describe("loopback login", () => {
     expect(result.profile.relayUrl).toBe(chainConfig.relayUrl);
     await expect(readWalletProfile("mainnet", env)).resolves.toMatchObject({
       walletUrl: "https://account.megaeth.com",
-      relayUrl: "https://wallet-relay.megaeth.com",
+      relayUrl: "https://mainnet.megaeth.com/relay",
     });
   });
 

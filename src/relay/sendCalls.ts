@@ -1,5 +1,7 @@
-import { RelayActions } from "porto";
+import * as IntentActions from "@megaeth-labs/wallet-intent";
+import { Account } from "porto";
 import { createClient, defineChain, http, zeroAddress } from "viem";
+import type { Address, Call, Hex } from "viem";
 
 import { getChainConfig, type Network } from "../config/chains.js";
 import type { HexString } from "../config/profile.js";
@@ -13,20 +15,11 @@ export type RelayCall = {
   value: bigint;
 };
 
-export type PreparedRelayCalls = {
-  capabilities?: unknown;
-  context: unknown;
-  digest: HexString;
-  key?: unknown;
-};
-
-export type RelaySendResult = {
+export type RelayExecutionResult = {
   id: HexString;
-};
-
-export type RelayExecutionResult = RelaySendResult & {
-  prepared: PreparedRelayCalls;
-  signature: HexString;
+  receipts: RelayCallsStatus["receipts"];
+  status: number;
+  transactionHash: HexString;
 };
 
 export type RelayAccountKey = {
@@ -51,25 +44,24 @@ export type RelayCapabilities = {
   };
 };
 
+export type RelayPaymentPerGasToken = {
+  address: HexString;
+  feeToken?: boolean;
+  paymentPerGas?: HexString | null;
+  symbol: string;
+};
+
+export type RelayPaymentPerGasEntry = {
+  tokens: readonly RelayPaymentPerGasToken[];
+};
+
 export type PortoRelayActions = {
-  prepareCalls(
+  sendCalls(
     client: PortoRelayClient,
-    parameters: {
-      account: HexString;
-      calls: readonly RelayCall[];
-      feeToken?: HexString;
-      key: RelaySessionKey;
-    },
-  ): Promise<PreparedRelayCalls>;
-  signCalls(
-    prepared: PreparedRelayCalls,
-    parameters: { key: RelaySessionKey },
-  ): Promise<HexString>;
-  sendPreparedCalls(
-    client: PortoRelayClient,
-    parameters: PreparedRelayCalls & { signature: HexString },
-  ): Promise<RelaySendResult>;
-  getCallsStatus(
+    parameters: IntentActions.SendCallsInput,
+  ): Promise<IntentActions.SendCallsResult>;
+  getPaymentPerGas(client: PortoRelayClient): Promise<RelayPaymentPerGasEntry>;
+  getCallsStatus?(
     client: PortoRelayClient,
     parameters: { id: HexString },
   ): Promise<RelayCallsStatus>;
@@ -92,21 +84,25 @@ export type SendRelayCallsOptions = {
   sessionKey: RelaySessionKey;
 };
 
-export const portoRelayActions = RelayActions as unknown as PortoRelayActions;
+export const portoRelayActions: PortoRelayActions = {
+  getKeys: IntentActions.getKeys,
+  getPaymentPerGas: IntentActions.getPaymentPerGas,
+  sendCalls: IntentActions.sendCalls,
+};
 
 export function createPortoRelayClient(
   relayUrl: string,
   network: Network,
 ): PortoRelayClient {
-  const url = normalizeRelayUrl(relayUrl);
   const config = getChainConfig(network);
+  const url = resolvePortoRelayUrl(relayUrl, network);
   const chain = defineChain({
     id: config.chainId,
     name: config.name,
     nativeCurrency: config.nativeCurrency,
     rpcUrls: {
       default: {
-        http: [url],
+        http: [isLoopbackUrl(url) ? url : config.rpcUrl],
       },
     },
   });
@@ -116,6 +112,22 @@ export function createPortoRelayClient(
     pollingInterval: 1_000,
     transport: http(url),
   });
+}
+
+export function resolvePortoRelayUrl(
+  relayUrl: string,
+  network: Network,
+): string {
+  return resolveRelayUrl(relayUrl, getChainConfig(network).relayUrl);
+}
+
+function resolveRelayUrl(relayUrl: string, currentDefaultRelayUrl: string): string {
+  const url = normalizeRelayUrl(relayUrl);
+  if (url === normalizeRelayUrl("https://wallet-relay.megaeth.com")) {
+    return normalizeRelayUrl(currentDefaultRelayUrl);
+  }
+
+  return url;
 }
 
 export async function sendRelayCalls(
@@ -128,24 +140,23 @@ export async function sendRelayCalls(
     network: options.network,
     sessionKey: options.sessionKey,
   });
-  const prepared = await actions.prepareCalls(options.client, {
-    account: options.accountAddress,
-    calls: options.calls,
-    ...(feeToken === undefined ? {} : { feeToken }),
+
+  const receipt = await actions.sendCalls(options.client, {
+    account: Account.from({
+      address: options.accountAddress as Address,
+      keys: [options.sessionKey],
+    }),
+    calls: options.calls.map(toViemCall),
+    ...(feeToken === undefined ? {} : { feeToken: feeToken as Address }),
     key: options.sessionKey,
   });
-  const signature = await actions.signCalls(prepared, {
-    key: options.sessionKey,
-  });
-  const sent = await actions.sendPreparedCalls(options.client, {
-    ...prepared,
-    signature,
-  });
+  const normalizedReceipt = normalizeRelayReceipt(receipt, options.network);
 
   return {
-    id: sent.id,
-    prepared,
-    signature,
+    id: normalizedReceipt.transactionHash,
+    receipts: [normalizedReceipt],
+    status: isReceiptSuccess(receipt.status) ? 200 : 500,
+    transactionHash: normalizedReceipt.transactionHash,
   };
 }
 
@@ -188,10 +199,8 @@ async function findRelayFeeToken(
   symbol: string,
   chainId: number,
 ): Promise<RelayFeeTokenCapability | undefined> {
-  const capabilities = await options.actions.getCapabilities?.(options.client, {
-    chainId,
-  });
-  const tokens = capabilities?.fees?.tokens ?? [];
+  const paymentPerGas = await options.actions.getPaymentPerGas(options.client);
+  const tokens = paymentPerGas.tokens;
   return tokens.find(
     (token) =>
       token.feeToken !== false &&
@@ -199,8 +208,67 @@ async function findRelayFeeToken(
   );
 }
 
+function toViemCall(call: RelayCall): Call {
+  return {
+    data: call.data as Hex,
+    to: call.to as Address,
+    value: call.value,
+  };
+}
+
+function normalizeRelayReceipt(
+  receipt: IntentActions.SendCallsResult,
+  network: Network,
+): NonNullable<RelayCallsStatus["receipts"]>[number] {
+  const config = getChainConfig(network);
+
+  return {
+    blockHash: receipt.blockHash as HexString,
+    blockNumber: quantityToNumber(receipt.blockNumber, "blockNumber"),
+    chainId:
+      receipt.chainId === undefined
+        ? config.chainId
+        : quantityToNumber(receipt.chainId, "chainId"),
+    gasUsed: quantityToNumber(receipt.gasUsed, "gasUsed"),
+    logs: receipt.logs.map((log) => ({
+      address: log.address as HexString,
+      data: log.data as HexString,
+      topics: log.topics as HexString[],
+    })),
+    status: normalizeReceiptStatus(receipt.status),
+    transactionHash: receipt.transactionHash as HexString,
+  };
+}
+
+function quantityToNumber(value: HexString | Hex | number, label: string): number {
+  const parsed =
+    typeof value === "number" ? value : Number.parseInt(value.slice(2), 16);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new CliError(`relay receipt ${label} is not a safe integer`);
+  }
+
+  return parsed;
+}
+
+function normalizeReceiptStatus(value: HexString | Hex | string): HexString {
+  if (value === "success") return "0x1";
+  if (value === "reverted" || value === "failure") return "0x0";
+  if (/^0x[0-9a-fA-F]+$/.test(value)) return value as HexString;
+
+  return "0x0";
+}
+
+function isReceiptSuccess(value: HexString | Hex | string): boolean {
+  return normalizeReceiptStatus(value) === "0x1";
+}
+
 function isNativeFeeSymbol(symbol: string): boolean {
   return symbol.toLowerCase() === "eth" || symbol.toLowerCase() === "native";
+}
+
+function isLoopbackUrl(value: string): boolean {
+  const { hostname } = new URL(value);
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
 export function relayErrorToCliError(error: unknown): CliError {

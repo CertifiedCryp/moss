@@ -13,6 +13,7 @@ describe("chain configuration", () => {
     expect(getChainConfig("mainnet")).toMatchObject({
       chainId: 4326,
       name: "MegaETH Mainnet",
+      relayUrl: "https://mainnet.megaeth.com/relay",
       rpcUrl: "https://mainnet.megaeth.com/rpc",
       defaultFeeToken: {
         address: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
@@ -22,6 +23,7 @@ describe("chain configuration", () => {
     expect(getChainConfig("testnet")).toMatchObject({
       chainId: 6343,
       name: "MegaETH Testnet",
+      relayUrl: "https://carrot.megaeth.com/relay",
       rpcUrl: "https://carrot.megaeth.com/rpc",
       defaultFeeToken: {
         address: "0x15e9f2b0a747ac05c7446559306687085d161e5c",

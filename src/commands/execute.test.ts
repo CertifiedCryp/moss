@@ -15,9 +15,7 @@ import type { WalletProfile } from "../config/profile.js";
 import type {
   PortoRelayActions,
   PortoRelayClient,
-  PreparedRelayCalls,
 } from "../relay/sendCalls.js";
-import type { RelaySessionKey } from "../relay/sessionKey.js";
 
 const privateKey =
   "0x0000000000000000000000000000000000000000000000000000000000000001";
@@ -25,14 +23,9 @@ const accessAddress = "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf";
 const accountAddress = "0x1111111111111111111111111111111111111111";
 const target = "0x2222222222222222222222222222222222222222";
 const feeToken = "0x3333333333333333333333333333333333333333";
-const bundleId =
-  "0x4444444444444444444444444444444444444444444444444444444444444444";
 const txHash =
   "0x5555555555555555555555555555555555555555555555555555555555555555";
-const digest =
-  "0x6666666666666666666666666666666666666666666666666666666666666666";
-const signature =
-  "0x7777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777";
+const bundleId = txHash;
 
 const tempDirs: string[] = [];
 
@@ -45,13 +38,12 @@ afterEach(async () => {
 describe("wallet execute", () => {
   it("reconstructs a Porto session key and runs relay actions in order", async () => {
     const order: string[] = [];
-    const prepared = preparedResponse();
     const client = { name: "porto-client" };
     const relayActions = fakeRelayActions({
-      prepareCalls: async (actualClient, params) => {
-        order.push("prepare");
+      sendCalls: async (actualClient, params) => {
+        order.push("send");
         expect(actualClient).toBe(client);
-        expect(params.account).toBe(accountAddress);
+        expect(params.account.address).toBe(accountAddress);
         expect(params.calls).toEqual([
           {
             data: "0x1234",
@@ -60,58 +52,31 @@ describe("wallet execute", () => {
           },
         ]);
         expect(params.feeToken).toBe(zeroAddress);
-        expect(params.key.type).toBe("secp256k1");
-        expect(params.key.role).toBe("session");
-        expect(params.key.publicKey).toBe(accessAddress);
-        expect(params.key.privateKey?.()).toBe(privateKey);
-        expect(params.key.expiry).toBe(1_900_000_000);
-        expect(params.key.feeToken).toEqual({
+        expect(params.key?.type).toBe("secp256k1");
+        expect(params.key?.role).toBe("session");
+        expect(params.key?.publicKey).toBe(accessAddress);
+        expect(params.key?.privateKey?.()).toBe(privateKey);
+        expect(params.key?.expiry).toBe(1_900_000_000);
+        expect(params.key?.feeToken).toEqual({
           limit: "1",
           symbol: "ETH",
         });
-        expect(params.key.permissions?.calls).toEqual([
+        expect(params.key?.permissions?.calls).toEqual([
           {
             signature: "transfer(address,uint256)",
             to: target,
           },
         ]);
-        expect(params.key.permissions?.spend).toEqual([
+        expect(params.key?.permissions?.spend).toEqual([
           {
             limit: 5n,
             period: "day",
             token: feeToken,
           },
         ]);
-        return prepared;
-      },
-      signCalls: async (actualPrepared, params) => {
-        order.push("sign");
-        expect(actualPrepared).toBe(prepared);
-        expect(params.key.publicKey).toBe(accessAddress);
-        return signature;
-      },
-      sendPreparedCalls: async (actualClient, params) => {
-        order.push("send");
-        expect(actualClient).toBe(client);
-        expect(params).toEqual({
-          ...prepared,
-          signature,
-        });
-        return { id: bundleId };
-      },
-      getCallsStatus: async (actualClient, params) => {
-        order.push("status");
-        expect(actualClient).toBe(client);
-        expect(params).toEqual({ id: bundleId });
-        return order.filter((entry) => entry === "status").length === 1
-          ? {
-              id: bundleId,
-              status: 100,
-            }
-          : confirmedStatus();
+        return receiptResponse();
       },
     });
-    const sleep = vi.fn(async () => undefined);
 
     const result = await executeWalletCalls(
       {
@@ -129,7 +94,6 @@ describe("wallet execute", () => {
       dependencies({
         client,
         relayActions,
-        sleep,
       }),
     );
 
@@ -141,37 +105,36 @@ describe("wallet execute", () => {
       status: 200,
     });
     expect(result.receipts?.[0]?.transactionHash).toBe(txHash);
-    expect(order).toEqual(["prepare", "sign", "send", "status", "status"]);
-    expect(sleep).toHaveBeenCalledWith(1);
+    expect(result.transactionHash).toBe(txHash);
+    expect(order).toEqual(["send"]);
   });
 
   it("uses the approved fee token instead of the first spend token", async () => {
     const client = { name: "porto-client" };
     const relayActions = fakeRelayActions({
-      getCapabilities: vi.fn(async () => ({
-        fees: {
-          tokens: [
-            {
-              address: feeToken,
-              feeToken: true,
-              symbol: "USDm",
-            },
-          ],
-        },
+      getPaymentPerGas: vi.fn(async () => ({
+        tokens: [
+          {
+            address: feeToken,
+            feeToken: true,
+            paymentPerGas: "0x1",
+            symbol: "USDm",
+          },
+        ],
       })),
-      prepareCalls: async (_actualClient, params) => {
+      sendCalls: async (_actualClient, params) => {
         expect(params.feeToken).toBe(feeToken);
-        expect(params.key.feeToken).toEqual({
+        expect(params.key?.feeToken).toEqual({
           limit: "1",
           symbol: "USDm",
         });
-        expect(params.key.permissions?.spend).toEqual([
+        expect(params.key?.permissions?.spend).toEqual([
           {
             limit: 5n,
             period: "day",
           },
         ]);
-        return preparedResponse();
+        return receiptResponse();
       },
     });
 
@@ -206,14 +169,12 @@ describe("wallet execute", () => {
       }),
     );
 
-    expect(relayActions.getCapabilities).toHaveBeenCalledWith(client, {
-      chainId: 4326,
-    });
+    expect(relayActions.getPaymentPerGas).toHaveBeenCalledWith(client);
   });
 
   it("maps relay authorization failures to delegated-key errors", async () => {
     const relayActions = fakeRelayActions({
-      prepareCalls: async () => {
+      sendCalls: async () => {
         throw new Error("execution reverted: UnauthorizedCall()");
       },
     });
@@ -246,7 +207,7 @@ describe("wallet execute", () => {
       ),
     ).rejects.toThrow("is expired");
 
-    expect(relayActions.prepareCalls).not.toHaveBeenCalled();
+    expect(relayActions.sendCalls).not.toHaveBeenCalled();
   });
 
   it("explains how to recover when a profile has no delegated keys", async () => {
@@ -271,13 +232,13 @@ describe("wallet execute", () => {
       "wallet profile has no delegated keys; run mega wallet create-key",
     );
 
-    expect(relayActions.prepareCalls).not.toHaveBeenCalled();
+    expect(relayActions.sendCalls).not.toHaveBeenCalled();
   });
 
   it("redacts relay failure messages without leaking private key material", async () => {
     const longCalldata = `0x${"aa".repeat(64)}`;
     const relayActions = fakeRelayActions({
-      prepareCalls: async () => {
+      sendCalls: async () => {
         throw new Error(
           `relay rejected ${longCalldata} with key ${privateKey}`,
         );
@@ -299,7 +260,7 @@ describe("wallet execute", () => {
 
   it("uses nested relay details when the top-level relay error is generic", async () => {
     const relayActions = fakeRelayActions({
-      prepareCalls: async () => {
+      sendCalls: async () => {
         throw Object.assign(
           new Error("An error occurred while executing calls."),
           {
@@ -342,8 +303,10 @@ describe("wallet execute", () => {
     const parsed = JSON.parse(jsonStdout.text) as {
       id: string;
       receipts: { transactionHash: string }[];
+      transactionHash: string;
     };
-    expect(parsed.id).toBe("0x44444444...444444");
+    expect(parsed.id).toBe("0x55555555...555555");
+    expect(parsed.transactionHash).toBe(txHash);
     expect(parsed.receipts[0]?.transactionHash).toBe(txHash);
   });
 
@@ -365,7 +328,7 @@ describe("wallet execute", () => {
       },
     ]);
     const relayActions = fakeRelayActions({
-      prepareCalls: async (_client, params) => {
+      sendCalls: async (_client, params) => {
         expect(params.calls).toEqual([
           {
             data: "0x",
@@ -373,7 +336,7 @@ describe("wallet execute", () => {
             value: 3n,
           },
         ]);
-        return preparedResponse();
+        return receiptResponse();
       },
     });
     const stdout = memoryOutput();
@@ -450,66 +413,37 @@ function dependencies(options: {
 function fakeRelayActions(
   overrides: Partial<PortoRelayActions> = {},
 ): PortoRelayActions & {
-  getCallsStatus: ReturnType<typeof vi.fn>;
-  getCapabilities: ReturnType<typeof vi.fn>;
-  prepareCalls: ReturnType<typeof vi.fn>;
-  sendPreparedCalls: ReturnType<typeof vi.fn>;
-  signCalls: ReturnType<typeof vi.fn>;
+  getPaymentPerGas: ReturnType<typeof vi.fn>;
+  sendCalls: ReturnType<typeof vi.fn>;
 } {
   return {
-    getCallsStatus: vi.fn(async () => confirmedStatus()),
-    getCapabilities: vi.fn(),
-    prepareCalls: vi.fn(async () => preparedResponse()),
-    sendPreparedCalls: vi.fn(async () => ({ id: bundleId })),
-    signCalls: vi.fn(async () => signature),
+    getPaymentPerGas: vi.fn(async () => ({
+      tokens: [
+        {
+          address: zeroAddress,
+          feeToken: true,
+          paymentPerGas: "0x1",
+          symbol: "ETH",
+        },
+      ],
+    })),
+    sendCalls: vi.fn(async () => receiptResponse()),
     ...overrides,
   } as PortoRelayActions & {
-    getCallsStatus: ReturnType<typeof vi.fn>;
-    getCapabilities: ReturnType<typeof vi.fn>;
-    prepareCalls: ReturnType<typeof vi.fn>;
-    sendPreparedCalls: ReturnType<typeof vi.fn>;
-    signCalls: ReturnType<typeof vi.fn>;
+    getPaymentPerGas: ReturnType<typeof vi.fn>;
+    sendCalls: ReturnType<typeof vi.fn>;
   };
 }
 
-function preparedResponse(): PreparedRelayCalls {
+function receiptResponse(): Awaited<ReturnType<PortoRelayActions["sendCalls"]>> {
   return {
-    capabilities: {
-      feeSignature:
-        "0x8888888888888888888888888888888888888888888888888888888888888888",
-    },
-    context: {
-      quote: {
-        id: "quote-1",
-      },
-    },
-    digest,
-    key: {
-      prehash: false,
-      publicKey: accessAddress,
-      type: "secp256k1",
-    },
-  };
-}
-
-function confirmedStatus(): Awaited<
-  ReturnType<PortoRelayActions["getCallsStatus"]>
-> {
-  return {
-    id: bundleId,
-    receipts: [
-      {
-        blockHash:
-          "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        blockNumber: 1,
-        chainId: 4326,
-        gasUsed: 21_000,
-        logs: [],
-        status: "0x1",
-        transactionHash: txHash,
-      },
-    ],
-    status: 200,
+    blockHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    blockNumber: "0x1",
+    chainId: "0x10e6",
+    gasUsed: "0x5208",
+    logs: [],
+    status: "0x1",
+    transactionHash: txHash,
   };
 }
 

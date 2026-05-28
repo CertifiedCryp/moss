@@ -6,6 +6,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { chromium } from "playwright";
+import { encodeAbiParameters, parseAbiParameters } from "viem";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultE2eDir = resolve(repoRoot, ".e2e");
@@ -22,9 +23,11 @@ const chainConfigs = {
   },
 };
 const nativeTokenAddress = "native";
-const defaultRelayUrl = "https://wallet-relay.megaeth.com";
+const defaultRelayUrl = "https://mainnet.megaeth.com/relay";
 const anyCallTarget = "0x3232323232323232323232323232323232323232";
 const anyCallSelector = "0x32323232";
+const mockOrchestratorAddress = "0x1111111111111111111111111111111111111111";
+const mockAccountProxyAddress = "0x2222222222222222222222222222222222222222";
 const deviceUserCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 class ScreenOnlyComplete extends Error {
@@ -792,6 +795,26 @@ async function handleShimRequest(
     return;
   }
 
+  if (
+    request.method === "PUT" &&
+    url.pathname.startsWith("/v1/wallet/") &&
+    url.pathname.endsWith("/upgrade")
+  ) {
+    const address = normalizeAddress(
+      url.pathname
+        .slice("/v1/wallet/".length)
+        .slice(0, -"/upgrade".length),
+    );
+    const body = await readJson(request);
+    state.wallets[address] = {
+      ...(state.wallets[address] ?? { walletAddress: address, alias: address }),
+      upgrade: body,
+    };
+    await writeShimState(statePath, state);
+    json(response, request, 200, { ok: true });
+    return;
+  }
+
   if (request.method === "PUT" && url.pathname === "/v1/wallet/alias") {
     const body = await readJson(request);
     const address = normalizeAddress(body.address);
@@ -896,7 +919,13 @@ async function handleMockRelayRpc(
 
 function isMockRelayMethod(method) {
   return [
+    "eth_call",
+    "eth_chainId",
+    "eth_getCode",
+    "eth_getTransactionCount",
     "wallet_prepareCalls",
+    "wallet_getCapabilities",
+    "wallet_getPaymentPerGas",
     "wallet_sendPreparedCalls",
     "wallet_sendCalls",
     "wallet_getCallsStatus",
@@ -909,10 +938,33 @@ function mockRelayResult(entry, state, chainConfig) {
   const method = entry?.method;
 
   switch (method) {
+    case "eth_call":
+      return mockEthCall(entry, chainConfig);
+    case "eth_chainId":
+      return {
+        jsonrpc: "2.0",
+        id,
+        result: chainConfig.chainIdHex,
+      };
+    case "eth_getCode":
+      return {
+        jsonrpc: "2.0",
+        id,
+        result: "0x01",
+      };
+    case "eth_getTransactionCount":
+      return {
+        jsonrpc: "2.0",
+        id,
+        result: "0x0",
+      };
     case "wallet_prepareCalls":
       return mockPrepareCalls(entry);
+    case "wallet_getCapabilities":
+      return mockGetCapabilities(entry, chainConfig);
+    case "wallet_getPaymentPerGas":
+      return mockGetPaymentPerGas(entry, chainConfig);
     case "wallet_sendPreparedCalls":
-    case "wallet_sendCalls":
       return {
         jsonrpc: "2.0",
         id,
@@ -920,6 +972,8 @@ function mockRelayResult(entry, state, chainConfig) {
           id: `0x${randomBytes(32).toString("hex")}`,
         },
       };
+    case "wallet_sendCalls":
+      return mockSendCalls(entry, chainConfig);
     case "wallet_getCallsStatus": {
       const callId = entry?.params?.[0]?.id ?? `0x${"11".repeat(32)}`;
       return {
@@ -990,6 +1044,137 @@ function mockPrepareCalls(entry) {
         types: {},
       },
     },
+  };
+}
+
+function mockGetCapabilities(entry, chainConfig) {
+  const id = entry?.id ?? null;
+  const chainIds = entry?.params?.[1] ?? [chainConfig.chainIdHex];
+  const result = {};
+
+  for (const chainId of chainIds) {
+    result[chainId] = {
+      contracts: {
+        accountProxy: {
+          address: mockAccountProxyAddress,
+        },
+        orchestrator: {
+          address: mockOrchestratorAddress,
+        },
+      },
+    };
+  }
+
+  return {
+    jsonrpc: "2.0",
+    id,
+    result,
+  };
+}
+
+function mockGetPaymentPerGas(entry, chainConfig) {
+  const id = entry?.id ?? null;
+  const chainIds = entry?.params?.[0] ?? [chainConfig.chainIdHex];
+  const result = {};
+
+  for (const chainId of chainIds) {
+    result[chainId] = {
+      maxFeePerGas: "0x1",
+      tokens: [
+        {
+          uid: "ETH",
+          address: "0x0000000000000000000000000000000000000000",
+          decimals: 18,
+          feeToken: true,
+          symbol: "ETH",
+          nativeRate: null,
+          paymentPerGas: "0x1",
+        },
+        {
+          uid: "USDm",
+          address: chainConfig.usdmAddress,
+          decimals: 18,
+          feeToken: true,
+          symbol: "USDm",
+          nativeRate: null,
+          paymentPerGas: "0x1",
+        },
+        {
+          uid: "USDT0",
+          address: chainConfig.usdt0Address,
+          decimals: 6,
+          feeToken: true,
+          symbol: "USDT0",
+          nativeRate: null,
+          paymentPerGas: "0x1",
+        },
+      ],
+    };
+  }
+
+  return {
+    jsonrpc: "2.0",
+    id,
+    result,
+  };
+}
+
+function mockSendCalls(entry, chainConfig) {
+  const id = entry?.id ?? null;
+
+  return {
+    jsonrpc: "2.0",
+    id,
+    result: {
+      blockHash: `0x${"22".repeat(32)}`,
+      blockNumber: "0x1",
+      chainId: chainConfig.chainIdHex,
+      gasUsed: "0x5208",
+      logs: [],
+      status: "0x1",
+      transactionHash: `0x${randomBytes(32).toString("hex")}`,
+    },
+  };
+}
+
+function mockEthCall(entry, chainConfig) {
+  const id = entry?.id ?? null;
+  const call = entry?.params?.[0] ?? {};
+  const data = String(call.data ?? "").toLowerCase();
+
+  if (data.startsWith("0x84b0196e")) {
+    return {
+      jsonrpc: "2.0",
+      id,
+      result: encodeAbiParameters(
+        parseAbiParameters(
+          "bytes1,string,string,uint256,address,bytes32,uint256[]",
+        ),
+        [
+          "0x0f",
+          "IthacaAccount",
+          "0.5.12",
+          BigInt(chainConfig.chainIdHex),
+          mockOrchestratorAddress,
+          `0x${"00".repeat(32)}`,
+          [],
+        ],
+      ),
+    };
+  }
+
+  if (data.startsWith("0x3e1b0812")) {
+    return {
+      jsonrpc: "2.0",
+      id,
+      result: encodeAbiParameters(parseAbiParameters("uint256"), [0n]),
+    };
+  }
+
+  return {
+    jsonrpc: "2.0",
+    id,
+    result: "0x",
   };
 }
 
@@ -1322,7 +1507,10 @@ async function routeWalletRelayToShim(page, runOptions) {
   await page.route(`${relayOrigin}/**`, async (route) => {
     const request = route.request();
     const target = new URL(request.url());
-    const shimPath = target.pathname === "/" ? "/rpc" : target.pathname;
+    const shimPath =
+      target.pathname === "/" || target.pathname === "/relay"
+        ? "/rpc"
+        : target.pathname;
     const shimUrl = `${shimApiUrl(runOptions)}${shimPath}${target.search}`;
     const response = await route.fetch({ url: shimUrl });
     await route.fulfill({ response });
@@ -2082,11 +2270,22 @@ async function assertPermissionScreen(page, timeoutMs, runOptions) {
     "100 USDM spend permission",
     timeoutMs,
   );
+  await waitForBodyText(
+    page,
+    (text) => /0x32323232/i.test(text) && /0x3232/i.test(text),
+    "default call permission",
+    timeoutMs,
+  );
+  await waitForBodyText(
+    page,
+    (text) => text.includes("Create offline transactions"),
+    "offline executor permission",
+    timeoutMs,
+  );
 
   const body = await page.locator("body").innerText();
   assertMissing(body, "total over the next week");
   assertMissing(body, "No token spend requested");
-  assertMissing(body, "Create offline transactions");
   assertMissing(body, "Pay up to 0 ETH in fees");
   assertMissing(body, "Pay up to 0 eth in fees");
   assertMissing(body, "$1 USDM");

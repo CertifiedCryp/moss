@@ -18,17 +18,14 @@ import { compactAddress, redactString, toJson } from "../output.js";
 import {
   createPortoRelayClient,
   relayErrorToCliError,
+  resolvePortoRelayUrl,
   sendRelayCalls,
   type PortoRelayActions,
   type PortoRelayClient,
   type RelayCall,
 } from "../relay/sendCalls.js";
 import { sessionKeyFromWalletKey } from "../relay/sessionKey.js";
-import {
-  isSuccessfulRelayStatus,
-  pollRelayCallsStatus,
-  type RelayCallsStatus,
-} from "../relay/status.js";
+import type { RelayCallsStatus } from "../relay/status.js";
 
 export type ExecuteCommandOptions = {
   calls?: string;
@@ -65,6 +62,7 @@ export type ExecuteCommandResult = {
   receipts: RelayCallsStatus["receipts"];
   relayUrl: string;
   status: number;
+  transactionHash?: HexString;
 };
 
 export type ExecuteCommandDependencies = {
@@ -103,13 +101,13 @@ export function registerExecuteCommand(
     .option("--network <network>", "wallet network: mainnet or testnet")
     .option(
       "--poll-interval-ms <ms>",
-      "relay status polling interval",
+      "deprecated; ignored for direct relay sends",
       parsePositiveInteger,
       1_000,
     )
     .option(
       "--timeout-ms <ms>",
-      "relay status polling timeout",
+      "deprecated; ignored for direct relay sends",
       parsePositiveInteger,
       120_000,
     )
@@ -158,9 +156,10 @@ export async function executeWalletCalls(
     (dependencies.now ?? (() => new Date()))(),
   );
   const sessionKey = sessionKeyFromWalletKey(selectedKey);
+  const relayUrl = resolvePortoRelayUrl(profile.relayUrl, network);
   const client =
-    dependencies.createRelayClient?.(profile.relayUrl, network) ??
-    createPortoRelayClient(profile.relayUrl, network);
+    dependencies.createRelayClient?.(relayUrl, network) ??
+    createPortoRelayClient(relayUrl, network);
 
   try {
     const sent = await sendRelayCalls({
@@ -171,18 +170,10 @@ export async function executeWalletCalls(
       network,
       sessionKey,
     });
-    const status = await pollRelayCallsStatus({
-      actions: dependencies.relayActions,
-      client,
-      id: sent.id,
-      intervalMs: options.pollIntervalMs,
-      sleep: dependencies.sleep,
-      timeoutMs: options.timeoutMs,
-    });
 
-    if (!isSuccessfulRelayStatus(status.status)) {
+    if (sent.status >= 300) {
       throw new CliError(
-        `relay call bundle ${redactString(sent.id)} failed with status ${status.status}`,
+        `relay call ${redactString(sent.id)} failed with status ${sent.status}`,
       );
     }
 
@@ -193,9 +184,10 @@ export async function executeWalletCalls(
       accountAddress: profile.accountAddress,
       id: sent.id,
       network,
-      receipts: status.receipts,
-      relayUrl: profile.relayUrl,
-      status: status.status,
+      receipts: sent.receipts,
+      relayUrl,
+      status: sent.status,
+      transactionHash: sent.transactionHash,
     };
   } catch (error) {
     if (error instanceof CliError) {
@@ -350,6 +342,7 @@ function renderExecuteResult(
   }
 
   const transactionHash =
+    result.transactionHash ??
     result.receipts?.[result.receipts.length - 1]?.transactionHash;
 
   if (options.terse) {
@@ -362,8 +355,7 @@ function renderExecuteResult(
   }
 
   const lines = [
-    "Relay call bundle submitted.",
-    `Bundle: ${redactString(result.id)}`,
+    "Relay transaction submitted.",
     `Status: ${result.status}`,
     `Network: ${result.network}`,
     `Account: ${compactAddress(result.accountAddress)}`,
