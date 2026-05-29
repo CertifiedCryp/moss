@@ -70,10 +70,12 @@ Normally omit `--no-browser` so the CLI opens the wallet automatically. Use
 `--no-browser` only as a fallback when the browser does not open or when you
 need to copy the loopback authorization URL manually.
 
-Fee allowances are token-denominated. A `maxFeesUSD` permission field is not
-implemented by the CLI; set `feeToken.limit` to the approved amount of
-`feeToken.symbol` instead. For native ETH relay fees, use `symbol: "ETH"`; do
-not encode it like native spend permissions, which omit `token`.
+Relay fee capacity is ordinary spend capacity for the selected fee token. The
+CLI does not implement `maxFeesUSD`; custom permissions should include enough
+`permissions.spend` for both the workflow and relay fees. `feeToken.symbol`
+selects the preferred fee token for later writes, and `feeToken.limit` is only
+used by the CLI as a convenience to add or merge that fee-token spend capacity
+when the token is known.
 
 If a profile already exists, `login` exits before opening the browser. Use
 `mega wallet create-key` to add a delegated key, or `mega wallet logout` to
@@ -119,10 +121,11 @@ mega wallet create-key \
 
 `create-key` requires an explicit call scope unless copying an existing key
 with `--from` or using a complete `--permissions ./permissions.json` file.
-`--spend-limit` accepts a human USDM amount and preserves the default fee token,
-expiry, spend token, and spend period while the `--allow-call` flags define
-what the key can execute. See [references/permissions.md](references/permissions.md)
-for custom expiry, fee token, spend token, spend period, no-spend, custom call
+`--spend-limit` accepts a human USDM workflow amount, preserves the default
+fee token, expiry, spend token, and spend period, and adds the default fee
+buffer to the requested spend cap. The `--allow-call` flags define what the key
+can execute. See [references/permissions.md](references/permissions.md) for
+custom expiry, fee token, spend token, spend period, no-spend, custom call
 scope, or multi-contract scopes.
 
 Switch or label local keys:

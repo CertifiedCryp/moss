@@ -164,25 +164,23 @@ and `transfer(address,uint256)`. CLI-created call scopes must include both
 a period. Native token spend is represented without a token address in the CLI
 profile and as the native/zero-address token in Porto/relay internals.
 
-`feeToken` is user-facing fee configuration, but Porto resolves it into spend
-permission for the selected fee token:
-
-- If a matching spend permission already exists, Porto adds the fee amount to
-  that spend limit and moves it to the first spend entry.
-- If no matching spend permission exists, Porto inserts a spend permission for
-  the fee token.
-
-Therefore UI copy like "fees" is product shorthand over a token spend allowance
-intended for the relay/orchestrator path. It is not EVM gas introspection and it
-is not a separate magical gas-only permission at the final relay permission
-layer. Be careful when changing defaults or copy around this.
+`feeToken.symbol` is local routing metadata for selecting the preferred relay
+payment token on later delegated writes. `feeToken.limit` is not an on-chain
+permission in the current `wallet-intent` send path. The durable permission is
+ordinary `permissions.spend` for the selected fee token. When resolving CLI
+permission requests, keep enough fee-token spend capacity in the request by
+buffering the matching spend limit or adding a separate fee-token spend row.
+Be careful when changing defaults or copy around this: UI text like "fees" is
+product shorthand over token spend allowance, not a separate gas-only contract
+permission.
 
 The create-key default keeps the visible approval simple: one-week expiry,
-network-specific USDM as the fee token with a `1 USDM` allowance, and a flat
-`100 USDM` spend cap for the authorization window. It must not silently request
-broad call authority. Require explicit call scopes from `--allow-call`, copied
-permissions from `--from`, or a full `--permissions` file. Do not create CLI
-write keys with omitted or empty `permissions.calls`, or with call entries that
+network-specific USDM as the fee token, a `100 USDM` workflow spend cap, and a
+`1 USDM` fee buffer merged into the USDM spend cap for the authorization window.
+It must not silently request broad call authority. Require explicit call scopes
+from `--allow-call`, copied permissions from `--from`, or a full
+`--permissions` file. Do not create CLI write keys with omitted or empty
+`permissions.calls`, or with call entries that
 omit either `to` or `signature`. Keep those caps and call-scope requirements
 explicit in prompt/UI copy, avoid ambiguous empty or omitted permissions, and
 update `README.md`, `SKILL.md`, tests, and this file together when changing the

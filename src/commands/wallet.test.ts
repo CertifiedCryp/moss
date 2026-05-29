@@ -173,9 +173,7 @@ describe("wallet status commands", () => {
       "Can call transfer(address,uint256) on 0x4444...4444",
     );
     expect(stdout.text).toContain("Can spend up to 0.1 0x5555...5555 per day");
-    expect(stdout.text).toContain(
-      "Can pay up to 1000000000000000 ETH in relay fees",
-    );
+    expect(stdout.text).toContain("Uses ETH for relay fees");
     expect(stdout.text).toContain("Approved scope (stored request):");
   });
 
@@ -383,7 +381,7 @@ describe("wallet status commands", () => {
     );
 
     expect(stdout.text).toContain("Can spend up to 100 USDm per week");
-    expect(stdout.text).toContain("Can pay up to 1 USDm in relay fees");
+    expect(stdout.text).toContain("Uses USDm for relay fees");
     expect(stdout.text).not.toContain("USDM");
   });
 
@@ -596,7 +594,7 @@ describe("wallet status commands", () => {
       authorizeKey: async (options) => {
         expect(options.permissionRequest.permissions.spend).toEqual([
           {
-            limit: "12500000000000000000",
+            limit: "13500000000000000000",
             period: "week",
             token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
           },
@@ -656,7 +654,7 @@ describe("wallet status commands", () => {
         expect(options.network).toBe("testnet");
         expect(options.permissionRequest.permissions.spend).toEqual([
           {
-            limit: "25000000000000000000",
+            limit: "26000000000000000000",
             period: "week",
             token: "0x15e9f2b0a747ac05c7446559306687085d161e5c",
           },

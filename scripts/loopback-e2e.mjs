@@ -801,9 +801,7 @@ async function handleShimRequest(
     url.pathname.endsWith("/upgrade")
   ) {
     const address = normalizeAddress(
-      url.pathname
-        .slice("/v1/wallet/".length)
-        .slice(0, -"/upgrade".length),
+      url.pathname.slice("/v1/wallet/".length).slice(0, -"/upgrade".length),
     );
     const body = await readJson(request);
     state.wallets[address] = {
@@ -2120,7 +2118,7 @@ async function runKeyManagementE2E(page, runOptions, initialProfile) {
   if (runOptions.permissionsFile) {
     await assertPermissionsOutput(permissions.stdout, runOptions);
   } else {
-    assertIncludes(permissions.stdout, "Can spend up to 100 USDm per week");
+    assertIncludes(permissions.stdout, "Can spend up to 101 USDm per week");
   }
 
   await withOutput((stdout) =>
@@ -2255,9 +2253,10 @@ async function assertPermissionScreen(page, timeoutMs, runOptions) {
       await waitForBodyText(
         page,
         (text) =>
-          normalizeText(text).includes(request.feeToken.limit) &&
-          normalizeText(text).includes(request.feeToken.symbol.toUpperCase()),
-        `${request.feeToken.limit} ${request.feeToken.symbol} fee permission`,
+          normalizeText(text).includes(
+            `Pay relay fees with ${request.feeToken.symbol.toUpperCase()}`,
+          ),
+        `${request.feeToken.symbol} fee token`,
         timeoutMs,
       );
     }
@@ -2266,8 +2265,8 @@ async function assertPermissionScreen(page, timeoutMs, runOptions) {
 
   await waitForBodyText(
     page,
-    (text) => /Spend up to\s+100\s+USDM/i.test(text),
-    "100 USDM spend permission",
+    (text) => /Spend up to\s+101\s+USDM/i.test(text),
+    "101 USDM spend permission",
     timeoutMs,
   );
   await waitForBodyText(
@@ -2299,9 +2298,7 @@ async function assertPermissionsOutput(stdout, runOptions) {
   if (request.feeToken?.limit && request.feeToken?.symbol) {
     assertIncludes(
       stdout,
-      `Can pay up to ${request.feeToken.limit} ${formatSymbol(
-        request.feeToken.symbol,
-      )} in relay fees`,
+      `Uses ${formatSymbol(request.feeToken.symbol)} for relay fees`,
     );
   }
 }

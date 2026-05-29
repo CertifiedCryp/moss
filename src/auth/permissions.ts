@@ -33,6 +33,29 @@ const defaultPermissionTtlSeconds = 7 * 24 * 60 * 60;
 const defaultFeeTokenLimit = "1";
 const defaultUsdmSpendLimit = "100000000000000000000";
 const usdmDecimals = 18;
+const nativeDecimals = 18;
+const nativeFeeSymbols = new Set(["eth", "native"]);
+const extraFeeTokensByNetwork: Partial<
+  Record<
+    Network,
+    Record<string, { token: HexString; decimals: number; symbol: string }>
+  >
+> = {
+  mainnet: {
+    usdt0: {
+      decimals: 6,
+      symbol: "USDT0",
+      token: "0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb",
+    },
+  },
+  testnet: {
+    tst: {
+      decimals: 6,
+      symbol: "TST",
+      token: "0x987439Bc4A5A9A2BCEC6354baEB4a1D1011210a1",
+    },
+  },
+};
 const selectorPattern = /^0x[0-9a-fA-F]{8}$/;
 const periods = new Set(["minute", "hour", "day", "week", "month", "year"]);
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
@@ -59,26 +82,29 @@ export async function resolveKeyPermissions(
           JSON.parse(await readFile(options.permissionsFile, "utf8")),
         );
 
-  if (allowCalls.length === 0) {
-    assertExecutableCallPermission(request);
-    return request;
-  }
-
   const existingCalls =
     options.permissionsFile === undefined
       ? []
       : (request.permissions.calls ?? []);
 
-  const merged = {
-    ...request,
-    permissions: {
-      ...request.permissions,
-      calls: [...existingCalls, ...allowCalls.map(parseAllowCall)],
-    },
-  };
+  const merged =
+    allowCalls.length === 0
+      ? request
+      : {
+          ...request,
+          permissions: {
+            ...request.permissions,
+            calls: [...existingCalls, ...allowCalls.map(parseAllowCall)],
+          },
+        };
 
-  assertExecutableCallPermission(merged);
-  return merged;
+  const resolved = includeFeeTokenSpendCapacity(
+    merged,
+    options.network ?? defaultNetwork,
+  );
+
+  assertExecutableCallPermission(resolved);
+  return resolved;
 }
 
 export function defaultKeyPermissions(
@@ -151,10 +177,13 @@ export function parsePermissionRequest(value: unknown): CliPermissionRequest {
     throw new CliError("permissions feeToken must be an object");
   }
 
-  const feeLimit = normalizeDecimalString(
-    value.feeToken.limit,
-    "permissions feeToken.limit is required",
-  );
+  const feeLimit =
+    value.feeToken.limit === undefined
+      ? "0"
+      : normalizeDecimalString(
+          value.feeToken.limit,
+          "permissions feeToken.limit must be a decimal string",
+        );
   const feeToken: CliPermissionRequest["feeToken"] = {
     limit: feeLimit,
   };
@@ -332,6 +361,109 @@ function normalizeDefaultUsdmSpendLimit(value: string | undefined): string {
   }
 
   return units.toString();
+}
+
+function includeFeeTokenSpendCapacity(
+  request: CliPermissionRequest,
+  network: Network,
+): CliPermissionRequest {
+  const feeLimit = request.feeToken.limit;
+  if (feeLimit === "0") {
+    return request;
+  }
+
+  const feeToken = resolveFeeTokenSpendTarget(request.feeToken.symbol, network);
+  if (feeToken === undefined) {
+    return request;
+  }
+
+  const feeLimitBaseUnits = decimalToBaseUnits(
+    feeLimit,
+    feeToken.decimals,
+    "permissions feeToken.limit has too many decimals for its token",
+  );
+  if (feeLimitBaseUnits === "0") {
+    return request;
+  }
+
+  const spend = request.permissions.spend.map((item) => ({ ...item }));
+  const index = spend.findIndex((item) =>
+    sameSpendToken(item.token, feeToken.token),
+  );
+
+  if (index === -1) {
+    spend.unshift({
+      limit: feeLimitBaseUnits,
+      period: spend[0]?.period ?? "week",
+      ...(feeToken.token === undefined ? {} : { token: feeToken.token }),
+    });
+  } else {
+    const existing = spend[index];
+    if (existing === undefined) {
+      return request;
+    }
+    spend[index] = {
+      ...existing,
+      limit: addIntegerStrings(existing.limit, feeLimitBaseUnits),
+    };
+  }
+
+  return {
+    ...request,
+    permissions: {
+      ...request.permissions,
+      spend,
+    },
+  };
+}
+
+function resolveFeeTokenSpendTarget(
+  symbol: string | undefined,
+  network: Network,
+): { token?: HexString; decimals: number } | undefined {
+  if (symbol === undefined || nativeFeeSymbols.has(symbol.toLowerCase())) {
+    return { decimals: nativeDecimals };
+  }
+
+  const chainConfig = getChainConfig(network);
+  if (
+    symbol.toLowerCase() === chainConfig.defaultFeeToken.symbol.toLowerCase()
+  ) {
+    return {
+      decimals: chainConfig.defaultFeeToken.decimals,
+      token: chainConfig.defaultFeeToken.address,
+    };
+  }
+
+  return extraFeeTokensByNetwork[network]?.[symbol.toLowerCase()];
+}
+
+function decimalToBaseUnits(
+  value: string,
+  decimals: number,
+  message: string,
+): string {
+  const amount = value.trim();
+  if (!decimalAmountPattern.test(amount)) {
+    throw new CliError(message);
+  }
+
+  const [whole = "", fraction = ""] = amount.split(".", 2);
+  if (fraction.length > decimals) {
+    throw new CliError(message);
+  }
+
+  const wholePart = whole === "" ? "0" : whole;
+  const fractionPart = fraction.padEnd(decimals, "0");
+  return `${wholePart}${fractionPart}`.replace(/^0+(?=\d)/, "");
+}
+
+function addIntegerStrings(a: string, b: string): string {
+  return (BigInt(a) + BigInt(b)).toString();
+}
+
+function sameSpendToken(a: HexString | undefined, b: HexString | undefined) {
+  return (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
 }
 
 function normalizeDecimalString(value: unknown, message: string): string {

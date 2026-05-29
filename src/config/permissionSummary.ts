@@ -92,12 +92,10 @@ function summarizeCalls(
 
 function summarizeFeeToken(feeToken: AuthorizedKey["feeToken"]): string[] {
   if (feeToken === undefined) {
-    return ["No relay fee token permission"];
+    return ["Uses ETH for relay fees when spend capacity is available"];
   }
 
-  return [
-    `Can pay up to ${feeToken.limit} ${displayTokenSymbol(feeToken.symbol)} in relay fees`,
-  ];
+  return [`Uses ${displayTokenSymbol(feeToken.symbol)} for relay fees`];
 }
 
 export function tokenLabel(

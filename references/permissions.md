@@ -31,7 +31,6 @@ the inner `permissions` object:
 {
   "expiry": 1800000000,
   "feeToken": {
-    "limit": "1",
     "symbol": "USDM"
   },
   "permissions": {
@@ -59,13 +58,13 @@ the inner `permissions` object:
 ## Field Rules
 
 - `expiry` is required and must be a future Unix timestamp in seconds.
-- `feeToken` is required. `feeToken.limit` is a human-decimal token amount,
-  such as `"1"` for 1 USDM; `symbol` is optional but should be included for
-  user-readable approval text.
-- `feeToken` is symbol-based and has no `token` address field. For native ETH
-  relay fees, use `"feeToken": { "limit": "0.001", "symbol": "ETH" }`. This is
-  different from native ETH spend permissions, where the spend entry omits
-  `token`.
+- `feeToken` is required. `feeToken.symbol` selects the preferred relay fee
+  token for later writes. Omit the symbol or use `ETH` for native ETH.
+- `feeToken.limit` is optional compatibility metadata, not an on-chain
+  permission by itself. When present for a known fee token, the CLI treats it as
+  a human-decimal fee buffer and adds or merges that amount into
+  `permissions.spend` before approval. You can also omit it and encode the fee
+  capacity directly in `permissions.spend`.
 - `maxFeesUSD` is not implemented by the CLI; do not include it in permission
   files.
 - `permissions` is required.
@@ -75,6 +74,10 @@ the inner `permissions` object:
 - Spend `period` must be `minute`, `hour`, `day`, `week`, `month`, or `year`.
 - Omit `token` for native ETH spend. Use a 20-byte token address for ERC20
   spend.
+- Custom permission files must include spend capacity for relay fees in the
+  selected fee token. If the fee token is also the workflow token, increase that
+  token's spend limit enough to cover both the workflow amount and fees. If the
+  fee token is different, add a separate spend row for it.
 - `permissions.calls` is required and must contain at least one entry. Do not
   omit it or use `permissions.calls: []`; both produce unusable or rejected
   write keys.

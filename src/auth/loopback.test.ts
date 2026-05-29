@@ -365,7 +365,7 @@ describe("loopback login", () => {
 
     expect(permissions.permissions.spend).toEqual([
       {
-        limit: "12500000000000000000",
+        limit: "13500000000000000000",
         period: "week",
         token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
       },
@@ -374,6 +374,52 @@ describe("loopback login", () => {
       {
         to: "0x3333333333333333333333333333333333333333",
         signature: "transfer(address,uint256)",
+      },
+    ]);
+  });
+
+  it("adds explicit spend capacity for custom fee-token requests", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mega-wallet-cli-permissions-"));
+    tempDirs.push(dir);
+    const permissionsFile = join(dir, "permissions.json");
+    await writeFile(
+      permissionsFile,
+      JSON.stringify({
+        expiry: 1_800_000_000,
+        feeToken: {
+          limit: "0.001",
+          symbol: "ETH",
+        },
+        permissions: {
+          calls: [
+            {
+              to: "0x3333333333333333333333333333333333333333",
+              signature: "transfer(address,uint256)",
+            },
+          ],
+          spend: [
+            {
+              limit: "1000000000000000000",
+              period: "week",
+              token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
+            },
+          ],
+        },
+      }),
+      "utf8",
+    );
+
+    const permissions = await resolveKeyPermissions({ permissionsFile });
+
+    expect(permissions.permissions.spend).toEqual([
+      {
+        limit: "1000000000000000",
+        period: "week",
+      },
+      {
+        limit: "1000000000000000000",
+        period: "week",
+        token: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
       },
     ]);
   });
@@ -495,7 +541,7 @@ describe("loopback login", () => {
 
     expect(permissions.permissions.spend).toEqual([
       {
-        limit: "12500000000000000000",
+        limit: "13500000000000000000",
         period: "week",
         token: "0x15e9f2b0a747ac05c7446559306687085d161e5c",
       },

@@ -106,12 +106,13 @@ targeting non-canonical endpoints. Use `--network testnet` for the wallet
 testnet profile and chain config.
 
 Create-key defaults keep the approval simple: one-week expiry, network-specific
-USDM as the fee token with a `1 USDM` allowance, and a flat `100 USDM` spend cap
-over the one-week authorization window. The agent must provide call scope with
-`--allow-call <target:signature>`, copy a known-good key with `--from`, or pass
-a complete `--permissions ./permissions.json` file. Do not create workflow keys
-with implicit broad call authority. Use the narrowest call and spend scope that
-covers the requested workflow.
+USDM as the fee token, a `100 USDM` workflow spend cap, and a `1 USDM` fee
+buffer merged into the USDM spend cap over the one-week authorization window.
+The agent must provide call scope with `--allow-call <target:signature>`, copy a
+known-good key with `--from`, or pass a complete `--permissions
+./permissions.json` file. Do not create workflow keys with implicit broad call
+authority. Use the narrowest call and spend scope that covers the requested
+workflow.
 
 Use `mega wallet create-key --spend-limit <amount> --allow-call ...` to
 override the default USDM spend cap while preserving the default fee token,
@@ -120,11 +121,13 @@ non-empty `permissions.calls` array. Never omit `permissions.calls`; omitted
 calls have produced keys that the relay rejects for writes. Each call entry
 must include both `to` and `signature`.
 
-Fee limits are token-denominated. The CLI does not implement `maxFeesUSD`; use
-`feeToken.limit` for the amount of `feeToken.symbol` the key may spend on relay
-fees. Fee token encoding is symbol-based; for native ETH relay fees use
-`"feeToken": { "limit": "0.001", "symbol": "ETH" }`. This differs from native
-ETH spend permissions, where the spend entry omits `token`.
+Relay fees use the same spend accounting as token/native movement. The CLI does
+not implement `maxFeesUSD`, and `feeToken.limit` is not an on-chain permission
+by itself. Make sure the approved `permissions.spend` includes enough capacity
+for both the workflow amount and expected relay fees in the selected fee token.
+`feeToken.symbol` selects the preferred fee token for later writes; when
+`feeToken.limit` is present for a known token, the CLI adds or merges that
+amount into `permissions.spend` before requesting approval.
 
 ## Inspect The Active Wallet
 
