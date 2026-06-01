@@ -127,6 +127,7 @@ pnpm e2e:loopback -- --screen-only --mock-relay --reset
 pnpm e2e:loopback -- --management --mock-relay --reset \
   --wallet-url http://localhost:4000 \
   --relay-url http://127.0.0.1:4002/rpc
+pnpm e2e:loopback:relay-smoke
 ```
 
 Login should produce a profile with no delegated keys; create-key should
@@ -135,6 +136,11 @@ create-key, list, permissions, label, switch, and revoke. Use the local
 `--relay-url` value above when `--mock-relay` needs to exercise command-level
 relay calls with the generated profile; it keeps those calls on the shim rather
 than production.
+
+The relay-smoke run uses the cached virtual WebAuthn profile under `.e2e`,
+creates or reuses a scoped `e2e-relay-smoke` key, and submits a real 0.0001
+USDM self-transfer. It must not be run with `--mock-relay`; the cached wallet
+needs enough USDM for the transfer and relay fee.
 
 ## Permission Model
 

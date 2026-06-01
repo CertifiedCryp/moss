@@ -18,17 +18,22 @@ const defaultE2eDir = resolve(repoRoot, ".e2e");
 const chainConfigs = {
   mainnet: {
     chainIdHex: "0x10e6",
+    rpcUrl: "https://mainnet.megaeth.com/rpc",
     usdmAddress: "0xfafddbb3fc7688494971a79cc65dca3ef82079e7",
     usdt0Address: "0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb",
   },
   testnet: {
     chainIdHex: "0x18c7",
+    rpcUrl: "https://carrot.megaeth.com/rpc",
     usdmAddress: "0x15e9f2b0a747ac05c7446559306687085d161e5c",
     usdt0Address: "0xd7617e72202b060ff8f315177748b52c7163a010",
   },
 };
 const nativeTokenAddress = "native";
 const defaultRelayUrl = "https://mainnet.megaeth.com/relay";
+const relaySmokeFeeLimit = "0.01";
+const relaySmokeLabel = "e2e-relay-smoke";
+const relaySmokeSpendLimit = "0.001";
 const anyCallTarget = "0x3232323232323232323232323232323232323232";
 const anyCallSelector = "0x32323232";
 const mockOrchestratorAddress = "0x1111111111111111111111111111111111111111";
@@ -112,6 +117,10 @@ try {
     if (options.management) {
       await runKeyManagementE2E(page, options, loginResult.profile);
     }
+
+    if (options.relaySmoke) {
+      await runRelaySmokeE2E(page, options, loginResult.profile);
+    }
   }
 
   if (options.hold) {
@@ -145,7 +154,9 @@ function parseArgs(args) {
     mockRelay: false,
     network: "mainnet",
     reset: false,
+    relaySmoke: false,
     screenOnly: false,
+    smokeAmount: "0.0001",
     authFlow: "loopback",
     shimPort: 4002,
     shimOnly: false,
@@ -215,6 +226,9 @@ function parseArgs(args) {
       case "--relay-url":
         parsed.relayUrl = readValue(args, ++index, arg);
         break;
+      case "--relay-smoke":
+        parsed.relaySmoke = true;
+        break;
       case "--reset":
         parsed.reset = true;
         break;
@@ -229,6 +243,9 @@ function parseArgs(args) {
         break;
       case "--shim-only":
         parsed.shimOnly = true;
+        break;
+      case "--smoke-amount":
+        parsed.smokeAmount = readValue(args, ++index, arg);
         break;
       case "--timeout-ms":
         parsed.timeoutMs = parsePositiveInteger(
@@ -257,6 +274,12 @@ function parseArgs(args) {
   if (parsed.artifactsDir === resolve(defaultE2eDir, "artifacts")) {
     parsed.artifactsDir = resolve(parsed.e2eDir, "artifacts");
   }
+  if (parsed.relaySmoke && parsed.mockRelay) {
+    throw new Error(
+      "--relay-smoke requires the real relay; remove --mock-relay",
+    );
+  }
+  parsePositiveDecimal(parsed.smokeAmount, "--smoke-amount");
   return parsed;
 }
 
@@ -274,6 +297,13 @@ function parsePositiveInteger(value, flag) {
     throw new Error(`${flag} must be a positive integer`);
   }
   return parsed;
+}
+
+function parsePositiveDecimal(value, flag) {
+  if (!/^\d+(?:\.\d+)?$/.test(value) || Number(value) <= 0) {
+    throw new Error(`${flag} must be a positive decimal amount`);
+  }
+  return value;
 }
 
 function stripTrailingSlash(value) {
@@ -298,6 +328,7 @@ Options:
   --hold                 Keep the browser open after the check
   --management           Run live delegated-key management checks after login
   --mock-relay           Mock relay send/status/key RPCs in the local shim
+  --relay-smoke          Create/reuse a scoped key and submit a real 0.0001 USDM self-transfer
   --network <network>    CLI wallet network: mainnet or testnet (default: mainnet)
   --reset                Delete .e2e state before starting
   --wallet-url <url>     Wallet UI URL (default: http://localhost:4000)
@@ -305,6 +336,7 @@ Options:
   --allow-call <scope>   Add target:signature call scope, repeatable
   --shim-port <port>     Local shim backend port (default: 4002)
   --shim-only            Start only the local shim backend
+  --smoke-amount <amt>   USDM amount for --relay-smoke self-transfer (default: 0.0001)
   --relay-url <url>      Relay proxy target (default: ${defaultRelayUrl})
   --timeout-ms <ms>      Login timeout (default: 120000)
   --profile-dir <path>   Playwright profile directory
@@ -1787,6 +1819,19 @@ async function waitForStoredAccount(page, timeoutMs) {
 }
 
 async function runCliLogin(page, runOptions) {
+  if (!runOptions.screenOnly) {
+    const existingProfile = await readExistingCliProfile(runOptions);
+    if (existingProfile !== undefined) {
+      console.log(
+        `Using existing CLI profile from ${runOptions.configDir}; pass --reset to recreate it.`,
+      );
+      return {
+        screenOnly: false,
+        profile: existingProfile,
+      };
+    }
+  }
+
   if (runOptions.authFlow === "device") {
     return runDeviceCliLogin(page, runOptions);
   }
@@ -1829,6 +1874,28 @@ async function runCliLogin(page, runOptions) {
   } catch (error) {
     if (runOptions.screenOnly && error instanceof ScreenOnlyComplete) {
       return { screenOnly: true };
+    }
+    throw error;
+  }
+}
+
+async function readExistingCliProfile(runOptions) {
+  const profileStore = await import(
+    pathToFileURL(resolve(repoRoot, "dist/config/profile.js")).href
+  );
+  const env = {
+    ...process.env,
+    MEGA_WALLET_CLI_CONFIG_DIR: runOptions.configDir,
+  };
+
+  try {
+    return await profileStore.readWalletProfile(runOptions.network, env);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes(`no ${runOptions.network} wallet profile found`)
+    ) {
+      return undefined;
     }
     throw error;
   }
@@ -2277,6 +2344,149 @@ async function runKeyManagementE2E(page, runOptions, initialProfile) {
   console.log(`Restored active key: ${firstKey.accessAddress}`);
 }
 
+async function runRelaySmokeE2E(page, runOptions, initialProfile) {
+  if (runOptions.authFlow !== "loopback") {
+    throw new Error("--relay-smoke requires --auth-flow loopback");
+  }
+
+  const [walletCommands, transferCommands, loopback, profileStore] =
+    await Promise.all([
+      import(pathToFileURL(resolve(repoRoot, "dist/commands/wallet.js")).href),
+      import(
+        pathToFileURL(resolve(repoRoot, "dist/commands/transfer.js")).href
+      ),
+      import(pathToFileURL(resolve(repoRoot, "dist/auth/loopback.js")).href),
+      import(pathToFileURL(resolve(repoRoot, "dist/config/profile.js")).href),
+    ]);
+  const env = {
+    ...process.env,
+    MEGA_WALLET_CLI_CONFIG_DIR: runOptions.configDir,
+  };
+  const chainConfig = e2eChainConfig(runOptions.network);
+  const previousActiveKeyId =
+    initialProfile.activeKeyId ??
+    initialProfile.keys.find((key) => key.status === "active")?.id;
+
+  console.log("Running real-relay self-transfer smoke E2E...");
+
+  let profile = await profileStore.readWalletProfile(runOptions.network, env);
+  let smokeKey = findRelaySmokeKey(profile, chainConfig);
+  if (smokeKey !== undefined) {
+    console.log(`Using cached smoke key: ${smokeKey.accessAddress}`);
+  } else {
+    const created = await withOutput((stdout) =>
+      walletCommands.runWalletCreateKey(
+        createRelaySmokeKeyOptions(runOptions, chainConfig),
+        {
+          authorizeKey: (options) =>
+            loopback.authorizeLoopbackKey({
+              ...options,
+              env,
+              openBrowser: async (authUrl) => {
+                await gotoWalletAuth(page, authUrl);
+                await assertRelaySmokePermissionScreen(
+                  page,
+                  runOptions.timeoutMs,
+                  chainConfig,
+                );
+                await approveLoopback(page, "Approve", runOptions.timeoutMs);
+              },
+            }),
+          env,
+          stdout,
+        },
+      ),
+    );
+    smokeKey = created.result.key;
+    profile = await profileStore.readWalletProfile(runOptions.network, env);
+  }
+
+  const transfer = await withOutput((stdout) =>
+    transferCommands.runWalletTransfer(
+      {
+        amount: runOptions.smokeAmount,
+        json: true,
+        key: smokeKey.id,
+        network: runOptions.network,
+        rpcUrl: chainConfig.rpcUrl,
+        to: profile.accountAddress,
+        token: chainConfig.usdmAddress,
+      },
+      { env, stdout },
+    ),
+  );
+  assertEqual(
+    transfer.result.status,
+    200,
+    "self-transfer smoke should return relay status 200",
+  );
+  assert(
+    /^0x[0-9a-fA-F]{64}$/.test(transfer.result.transactionHash ?? ""),
+    "self-transfer smoke did not return a full transaction hash",
+  );
+
+  if (previousActiveKeyId !== undefined) {
+    await withOutput((stdout) =>
+      walletCommands.runWalletSwitch(
+        previousActiveKeyId,
+        { network: runOptions.network, terse: true },
+        { env, stdout },
+      ),
+    );
+  }
+
+  console.log(
+    `Real-relay self-transfer smoke completed: ${transfer.result.transactionHash}`,
+  );
+}
+
+function createRelaySmokeKeyOptions(runOptions, chainConfig) {
+  return {
+    allowCall: [`${chainConfig.usdmAddress}:transfer(address,uint256)`],
+    authFlow: runOptions.authFlow,
+    feeLimit: relaySmokeFeeLimit,
+    feeToken: "USDM",
+    label: relaySmokeLabel,
+    network: runOptions.network,
+    relayUrl: runOptions.relayUrl,
+    spendLimit: [`${chainConfig.usdmAddress}:${relaySmokeSpendLimit}:week`],
+    timeoutMs: runOptions.timeoutMs,
+    walletApiUrl: shimApiUrl(runOptions),
+    walletUrl: runOptions.walletUrl,
+  };
+}
+
+function findRelaySmokeKey(profile, chainConfig) {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return profile.keys.find(
+    (key) =>
+      key.label === relaySmokeLabel &&
+      key.status === "active" &&
+      key.privateKey !== undefined &&
+      key.authorizedKey.expiry > nowSeconds &&
+      hasRelaySmokeCallScope(key, chainConfig) &&
+      hasRelaySmokeSpendScope(key, chainConfig),
+  );
+}
+
+function hasRelaySmokeCallScope(key, chainConfig) {
+  return Boolean(
+    key.authorizedKey.permissions.calls?.some(
+      (call) =>
+        call.to?.toLowerCase() === chainConfig.usdmAddress.toLowerCase() &&
+        call.signature === "transfer(address,uint256)",
+    ),
+  );
+}
+
+function hasRelaySmokeSpendScope(key, chainConfig) {
+  return key.authorizedKey.permissions.spend.some(
+    (spend) =>
+      spend.token?.toLowerCase() === chainConfig.usdmAddress.toLowerCase() &&
+      BigInt(spend.limit) > 0n,
+  );
+}
+
 async function assertMockRelayKeyRevoked(runOptions, key) {
   const response = await fetch(`http://127.0.0.1:${runOptions.shimPort}/rpc`, {
     method: "POST",
@@ -2368,7 +2578,9 @@ async function assertPermissionScreen(page, timeoutMs, runOptions) {
   );
   await waitForBodyText(
     page,
-    (text) => text.includes("Create offline transactions"),
+    (text) =>
+      text.includes("Create offline transactions") ||
+      text.includes("Offline Executor"),
     "offline executor permission",
     timeoutMs,
   );
@@ -2379,6 +2591,50 @@ async function assertPermissionScreen(page, timeoutMs, runOptions) {
   assertMissing(body, "Pay up to 0 ETH in fees");
   assertMissing(body, "Pay up to 0 eth in fees");
   assertMissing(body, "$1 USDM");
+}
+
+async function assertRelaySmokePermissionScreen(page, timeoutMs, chainConfig) {
+  await page.getByText("Permissions Requested", { exact: true }).waitFor({
+    timeout: timeoutMs,
+  });
+
+  await waitForBodyText(
+    page,
+    (text) => {
+      const normalized = normalizeText(text);
+      return (
+        /Pay relay fees with USDM/i.test(normalized) ||
+        /Fees up to\s+0\.01\s+USDm/i.test(normalized)
+      );
+    },
+    "USDM relay fee token",
+    timeoutMs,
+  );
+  await waitForBodyText(
+    page,
+    (text) =>
+      /Spend up to\s+0\.011\s+USDm\s+(?:per|every)\s+week/i.test(
+        normalizeText(text),
+      ),
+    "relay smoke USDM spend permission",
+    timeoutMs,
+  );
+  await waitForBodyText(
+    page,
+    (text) =>
+      text.toLowerCase().includes("transfer") &&
+      text.toLowerCase().includes(chainConfig.usdmAddress.slice(0, 6)),
+    "USDM transfer call permission",
+    timeoutMs,
+  );
+  await waitForBodyText(
+    page,
+    (text) =>
+      text.includes("Create offline transactions") ||
+      text.includes("Offline Executor"),
+    "offline executor permission",
+    timeoutMs,
+  );
 }
 
 async function assertPermissionsOutput(stdout, runOptions) {
