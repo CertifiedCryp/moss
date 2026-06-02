@@ -45,6 +45,7 @@ export type DeviceStartRequest =
       network: Network;
       accountAddress: HexString;
       accessAddress: HexString;
+      feeToken?: string;
       codeChallenge: string;
       codeChallengeMethod: "S256";
       state: string;
@@ -152,6 +153,7 @@ export type DeviceRevokeAuthorizationOptions = {
   walletApiUrl: string;
   accountAddress: HexString;
   accessAddress: HexString;
+  feeToken?: string;
   timeoutMs?: number;
   state?: string;
   client?: DeviceAuthClient;
@@ -352,6 +354,7 @@ export async function authorizeDeviceRevoke(
     network: options.network,
     accountAddress: options.accountAddress,
     accessAddress: options.accessAddress,
+    ...(options.feeToken === undefined ? {} : { feeToken: options.feeToken }),
     codeChallenge: pkce.codeChallenge,
     codeChallengeMethod: pkce.codeChallengeMethod,
     state,

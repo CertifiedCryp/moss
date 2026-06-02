@@ -2,6 +2,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -15,6 +16,12 @@ import {
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultE2eDir = resolve(repoRoot, ".e2e");
+const defaultRelaySmokeE2eDir = resolve(
+  homedir(),
+  ".mega",
+  "wallet-cli",
+  "e2e-relay-smoke",
+);
 const chainConfigs = {
   mainnet: {
     chainIdHex: "0x10e6",
@@ -31,9 +38,11 @@ const chainConfigs = {
 };
 const nativeTokenAddress = "native";
 const defaultRelayUrl = "https://mainnet.megaeth.com/relay";
-const relaySmokeFeeLimit = "0.01";
+const relaySmokeFeeLimit = "0.05";
 const relaySmokeLabel = "e2e-relay-smoke";
+const relaySmokeDeviceLabel = "e2e-relay-smoke-device";
 const relaySmokeSpendLimit = "0.001";
+const relaySmokeTotalSpendLimitBaseUnits = 51_000_000_000_000_000n;
 const anyCallTarget = "0x3232323232323232323232323232323232323232";
 const anyCallSelector = "0x32323232";
 const mockOrchestratorAddress = "0x1111111111111111111111111111111111111111";
@@ -168,6 +177,8 @@ function parseArgs(args) {
   let credentialsPath;
   let permissionsFile;
   let profileDir;
+  let customArtifactsDir = false;
+  let customE2eDir = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -179,6 +190,7 @@ function parseArgs(args) {
         break;
       case "--artifacts-dir":
         parsed.artifactsDir = resolve(readValue(args, ++index, arg));
+        customArtifactsDir = true;
         break;
       case "--auth-flow": {
         const authFlow = readValue(args, ++index, arg);
@@ -196,6 +208,7 @@ function parseArgs(args) {
         break;
       case "--e2e-dir":
         parsed.e2eDir = resolve(readValue(args, ++index, arg));
+        customE2eDir = true;
         break;
       case "--headed":
         parsed.headed = true;
@@ -265,18 +278,26 @@ function parseArgs(args) {
     }
   }
 
+  if (parsed.relaySmoke && !customE2eDir) {
+    parsed.e2eDir = defaultRelaySmokeE2eDir;
+  }
   parsed.walletUrl = stripTrailingSlash(parsed.walletUrl);
   parsed.configDir = configDir ?? resolve(parsed.e2eDir, "cli-config");
   parsed.credentialsPath =
     credentialsPath ?? resolve(parsed.e2eDir, "webauthn-credentials.json");
   parsed.permissionsFile = permissionsFile;
   parsed.profileDir = profileDir ?? resolve(parsed.e2eDir, "chromium-profile");
-  if (parsed.artifactsDir === resolve(defaultE2eDir, "artifacts")) {
+  if (!customArtifactsDir) {
     parsed.artifactsDir = resolve(parsed.e2eDir, "artifacts");
   }
   if (parsed.relaySmoke && parsed.mockRelay) {
     throw new Error(
       "--relay-smoke requires the real relay; remove --mock-relay",
+    );
+  }
+  if (parsed.relaySmoke && parsed.reset) {
+    throw new Error(
+      `--reset is disabled for --relay-smoke because it would delete persistent funded wallet credentials. Delete ${parsed.e2eDir} manually if you intentionally need a new relay-smoke wallet.`,
     );
   }
   parsePositiveDecimal(parsed.smokeAmount, "--smoke-amount");
@@ -328,9 +349,9 @@ Options:
   --hold                 Keep the browser open after the check
   --management           Run live delegated-key management checks after login
   --mock-relay           Mock relay send/status/key RPCs in the local shim
-  --relay-smoke          Create/reuse a scoped key and submit a real 0.0001 USDM self-transfer
+  --relay-smoke          Create/reuse a persistent scoped key and submit a real 0.0001 USDM self-transfer
   --network <network>    CLI wallet network: mainnet or testnet (default: mainnet)
-  --reset                Delete .e2e state before starting
+  --reset                Delete transient .e2e state before starting (not allowed with --relay-smoke)
   --wallet-url <url>     Wallet UI URL (default: http://localhost:4000)
   --permissions <path>   Permission request JSON file
   --allow-call <scope>   Add target:signature call scope, repeatable
@@ -856,6 +877,7 @@ async function handleShimRequest(
     const body = await readJson(request);
     const address = normalizeAddress(body.address);
     state.wallets[address] = {
+      ...(state.wallets[address] ?? {}),
       walletAddress: address,
       alias: address,
       primary: body.primary ?? true,
@@ -1593,6 +1615,10 @@ async function routeWalletRelayToShim(page, runOptions) {
   await page.route(`${relayOrigin}/**`, async (route) => {
     const request = route.request();
     const target = new URL(request.url());
+    if (target.pathname === "/rpc") {
+      await route.continue();
+      return;
+    }
     const shimPath =
       target.pathname === "/" || target.pathname === "/relay"
         ? "/rpc"
@@ -1953,6 +1979,7 @@ function createDeviceKeyAuthorizer(
 
     return authorizeDeviceKey({
       ...authorizationOptions,
+      walletApiUrl: shimApiUrl(runOptions),
       sleep: async (ms) => {
         await promptTask;
         await delay(Math.min(ms, 500));
@@ -2028,7 +2055,15 @@ async function handleDeviceGrantPrompt(
   }
 
   await page.getByRole("button", { name: "Approve CLI Key" }).click();
-  await assertPermissionScreen(page, runOptions.timeoutMs, runOptions);
+  if (runOptions.relaySmoke) {
+    await assertRelaySmokePermissionScreen(
+      page,
+      runOptions.timeoutMs,
+      e2eChainConfig(runOptions.network),
+    );
+  } else {
+    await assertPermissionScreen(page, runOptions.timeoutMs, runOptions);
+  }
 
   await page.getByRole("button", { name: "Approve" }).click();
 }
@@ -2345,10 +2380,6 @@ async function runKeyManagementE2E(page, runOptions, initialProfile) {
 }
 
 async function runRelaySmokeE2E(page, runOptions, initialProfile) {
-  if (runOptions.authFlow !== "loopback") {
-    throw new Error("--relay-smoke requires --auth-flow loopback");
-  }
-
   const [walletCommands, transferCommands, loopback, profileStore] =
     await Promise.all([
       import(pathToFileURL(resolve(repoRoot, "dist/commands/wallet.js")).href),
@@ -2367,10 +2398,12 @@ async function runRelaySmokeE2E(page, runOptions, initialProfile) {
     initialProfile.activeKeyId ??
     initialProfile.keys.find((key) => key.status === "active")?.id;
 
-  console.log("Running real-relay self-transfer smoke E2E...");
+  console.log(
+    `Running ${runOptions.authFlow} real-relay self-transfer smoke E2E...`,
+  );
 
   let profile = await profileStore.readWalletProfile(runOptions.network, env);
-  let smokeKey = findRelaySmokeKey(profile, chainConfig);
+  let smokeKey = findRelaySmokeKey(profile, chainConfig, runOptions.authFlow);
   if (smokeKey !== undefined) {
     console.log(`Using cached smoke key: ${smokeKey.accessAddress}`);
   } else {
@@ -2378,20 +2411,33 @@ async function runRelaySmokeE2E(page, runOptions, initialProfile) {
       walletCommands.runWalletCreateKey(
         createRelaySmokeKeyOptions(runOptions, chainConfig),
         {
-          authorizeKey: (options) =>
-            loopback.authorizeLoopbackKey({
-              ...options,
-              env,
-              openBrowser: async (authUrl) => {
-                await gotoWalletAuth(page, authUrl);
-                await assertRelaySmokePermissionScreen(
+          ...(runOptions.authFlow === "device"
+            ? {
+                authorizeKey: createDeviceKeyAuthorizer(
                   page,
-                  runOptions.timeoutMs,
-                  chainConfig,
-                );
-                await approveLoopback(page, "Approve", runOptions.timeoutMs);
-              },
-            }),
+                  runOptions,
+                ),
+              }
+            : {
+                authorizeKey: (options) =>
+                  loopback.authorizeLoopbackKey({
+                    ...options,
+                    env,
+                    openBrowser: async (authUrl) => {
+                      await gotoWalletAuth(page, authUrl);
+                      await assertRelaySmokePermissionScreen(
+                        page,
+                        runOptions.timeoutMs,
+                        chainConfig,
+                      );
+                      await approveLoopback(
+                        page,
+                        "Approve",
+                        runOptions.timeoutMs,
+                      );
+                    },
+                  }),
+              }),
           env,
           stdout,
         },
@@ -2436,17 +2482,16 @@ async function runRelaySmokeE2E(page, runOptions, initialProfile) {
   }
 
   console.log(
-    `Real-relay self-transfer smoke completed: ${transfer.result.transactionHash}`,
+    `${runOptions.authFlow} real-relay self-transfer smoke completed: ${transfer.result.transactionHash}`,
   );
 }
 
 function createRelaySmokeKeyOptions(runOptions, chainConfig) {
   return {
     allowCall: [`${chainConfig.usdmAddress}:transfer(address,uint256)`],
-    authFlow: runOptions.authFlow,
     feeLimit: relaySmokeFeeLimit,
     feeToken: "USDM",
-    label: relaySmokeLabel,
+    label: relaySmokeLabelForAuthFlow(runOptions.authFlow),
     network: runOptions.network,
     relayUrl: runOptions.relayUrl,
     spendLimit: [`${chainConfig.usdmAddress}:${relaySmokeSpendLimit}:week`],
@@ -2456,11 +2501,16 @@ function createRelaySmokeKeyOptions(runOptions, chainConfig) {
   };
 }
 
-function findRelaySmokeKey(profile, chainConfig) {
+function relaySmokeLabelForAuthFlow(authFlow) {
+  return authFlow === "device" ? relaySmokeDeviceLabel : relaySmokeLabel;
+}
+
+function findRelaySmokeKey(profile, chainConfig, authFlow) {
   const nowSeconds = Math.floor(Date.now() / 1000);
+  const label = relaySmokeLabelForAuthFlow(authFlow);
   return profile.keys.find(
     (key) =>
-      key.label === relaySmokeLabel &&
+      key.label === label &&
       key.status === "active" &&
       key.privateKey !== undefined &&
       key.authorizedKey.expiry > nowSeconds &&
@@ -2483,7 +2533,7 @@ function hasRelaySmokeSpendScope(key, chainConfig) {
   return key.authorizedKey.permissions.spend.some(
     (spend) =>
       spend.token?.toLowerCase() === chainConfig.usdmAddress.toLowerCase() &&
-      BigInt(spend.limit) > 0n,
+      BigInt(spend.limit) >= relaySmokeTotalSpendLimitBaseUnits,
   );
 }
 
@@ -2604,7 +2654,7 @@ async function assertRelaySmokePermissionScreen(page, timeoutMs, chainConfig) {
       const normalized = normalizeText(text);
       return (
         /Pay relay fees with USDM/i.test(normalized) ||
-        /Fees up to\s+0\.01\s+USDm/i.test(normalized)
+        /Fees up to\s+0\.05\s+USDm/i.test(normalized)
       );
     },
     "USDM relay fee token",
@@ -2613,7 +2663,7 @@ async function assertRelaySmokePermissionScreen(page, timeoutMs, chainConfig) {
   await waitForBodyText(
     page,
     (text) =>
-      /Spend up to\s+0\.011\s+USDm\s+(?:per|every)\s+week/i.test(
+      /Spend up to\s+0\.051\s+USDm\s+(?:per|every)\s+week/i.test(
         normalizeText(text),
       ),
     "relay smoke USDM spend permission",

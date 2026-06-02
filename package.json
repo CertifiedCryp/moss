@@ -16,6 +16,7 @@
     "e2e:functional": "npm run build && node scripts/wallet-functional-e2e.mjs",
     "e2e:functional:writes": "npm run e2e:functional -- --writes",
     "e2e:loopback": "npm run build && node scripts/loopback-e2e.mjs",
+    "e2e:device:relay-smoke": "npm run e2e:loopback -- --relay-smoke --auth-flow device",
     "e2e:loopback:relay-smoke": "npm run e2e:loopback -- --relay-smoke",
     "e2e:loopback:screen": "npm run e2e:loopback -- --screen-only",
     "install:local": "scripts/install.sh",

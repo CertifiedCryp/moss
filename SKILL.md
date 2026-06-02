@@ -72,6 +72,10 @@ fallback when the browser does not open automatically or when the user needs a
 URL to copy manually. `--no-browser` is not headless auth; it still uses
 same-machine loopback auth and waits for browser approval.
 
+Do not reuse old authorization URLs or edit their query parameters. If an auth
+command times out, is interrupted, or the browser link stops verifying, rerun
+the command and use the new URL it opens or prints.
+
 Device-code auth is not supported right now. Do not use `--auth-flow device`;
 use loopback auth on the same machine as the browser.
 

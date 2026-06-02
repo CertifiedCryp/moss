@@ -29,6 +29,7 @@ const tempDirs: string[] = [];
 const testPrivateKey =
   "0x0000000000000000000000000000000000000000000000000000000000000001";
 const testState = "state-12345678901234567890123456789012";
+const testRequestId = "request-123456789012345678901234567890";
 
 afterEach(async () => {
   await Promise.all(
@@ -58,6 +59,7 @@ describe("loopback login", () => {
         permissions,
         redirectUri: "http://127.0.0.1:49152/callback",
         state: testState,
+        requestId: testRequestId,
         network: "mainnet",
         clientName: "mega-cli",
       }),
@@ -72,6 +74,7 @@ describe("loopback login", () => {
       "http://127.0.0.1:49152/callback",
     );
     expect(url.searchParams.get("state")).toBe(testState);
+    expect(url.searchParams.get("requestId")).toBe(testRequestId);
     expect(url.searchParams.get("network")).toBe("mainnet");
     expect(url.searchParams.get("clientName")).toBe("mega-cli");
     expect(url.toString()).not.toContain(testPrivateKey);
@@ -109,6 +112,7 @@ describe("loopback login", () => {
         walletUrl: "https://wallet.example/base",
         redirectUri: "http://127.0.0.1:49152/callback",
         state: testState,
+        requestId: testRequestId,
         network: "mainnet",
         clientName: "mega-cli",
       }),
@@ -121,6 +125,7 @@ describe("loopback login", () => {
       "http://127.0.0.1:49152/callback",
     );
     expect(url.searchParams.get("state")).toBe(testState);
+    expect(url.searchParams.get("requestId")).toBe(testRequestId);
     expect(url.searchParams.get("network")).toBe("mainnet");
     expect(url.searchParams.get("clientName")).toBe("mega-cli");
     expect(url.searchParams.has("accessAddress")).toBe(false);
@@ -154,6 +159,30 @@ describe("loopback login", () => {
         expect(url.toString()).not.toContain(testPrivateKey);
         expect(url.searchParams.has("accessAddress")).toBe(false);
         expect(url.searchParams.has("permissions")).toBe(false);
+        await expect(
+          postLoopbackValidation(url, { operation: "login" }),
+        ).resolves.toMatchObject({
+          status: 200,
+          body: { status: "ok" },
+        });
+        await expect(
+          postLoopbackValidation(url, {
+            operation: "login",
+            overrides: { state: "wrong-state-12345678901234567890" },
+          }),
+        ).resolves.toMatchObject({
+          status: 400,
+          body: { error: "CLI request proof mismatch" },
+        });
+        await expect(
+          postLoopbackValidation(url, {
+            operation: "login",
+            origin: "https://evil.example",
+          }),
+        ).resolves.toMatchObject({
+          status: 403,
+          body: { error: "CLI validation origin is not allowed" },
+        });
         callbackUrl = buildLoginCallbackUrl(
           url.searchParams.get("redirectUri") as LoopbackRedirectUri,
           {
@@ -262,6 +291,21 @@ describe("loopback login", () => {
         timeoutMs: 1_000,
         openBrowser: async (authUrl) => {
           const url = new URL(authUrl);
+          await expect(
+            postLoopbackValidation(url, { operation: "grant" }),
+          ).resolves.toMatchObject({
+            status: 200,
+            body: { status: "ok" },
+          });
+          await expect(
+            postLoopbackValidation(url, {
+              operation: "grant",
+              overrides: { permissions: "tampered" },
+            }),
+          ).resolves.toMatchObject({
+            status: 400,
+            body: { error: "CLI request proof mismatch" },
+          });
           const callbackUrl = buildCallbackUrl(
             url.searchParams.get("redirectUri") as LoopbackRedirectUri,
             {
@@ -358,6 +402,7 @@ describe("loopback login", () => {
         feeToken: "USDm",
         redirectUri: "http://127.0.0.1:49152/callback",
         state: testState,
+        requestId: testRequestId,
         network: "mainnet",
         clientName: "mega-cli",
       }),
@@ -681,6 +726,55 @@ async function tempEnv(): Promise<NodeJS.ProcessEnv> {
   tempDirs.push(dir);
 
   return { MEGA_WALLET_CLI_CONFIG_DIR: dir };
+}
+
+async function postLoopbackValidation(
+  authUrl: URL,
+  options: {
+    operation: "login" | "grant" | "revoke";
+    origin?: string;
+    overrides?: Record<string, string>;
+  },
+): Promise<{ status: number; body: unknown }> {
+  const redirectUri = authUrl.searchParams.get("redirectUri");
+  if (!redirectUri) {
+    throw new Error("missing redirectUri");
+  }
+
+  const validationUrl = new URL("/cli-auth/validate", redirectUri);
+  const body: Record<string, string> = {
+    operation: options.operation,
+    requestId: authUrl.searchParams.get("requestId") ?? "",
+    state: authUrl.searchParams.get("state") ?? "",
+    redirectUri,
+    network: authUrl.searchParams.get("network") ?? "",
+    clientName: authUrl.searchParams.get("clientName") ?? "",
+  };
+
+  if (options.operation === "grant" || options.operation === "revoke") {
+    body.accessAddress = authUrl.searchParams.get("accessAddress") ?? "";
+  }
+  if (options.operation === "grant") {
+    body.permissions = authUrl.searchParams.get("permissions") ?? "";
+  }
+  if (options.operation === "revoke" && authUrl.searchParams.has("feeToken")) {
+    body.feeToken = authUrl.searchParams.get("feeToken") ?? "";
+  }
+  Object.assign(body, options.overrides);
+
+  const response = await fetch(validationUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin: options.origin ?? authUrl.origin,
+    },
+    body: JSON.stringify(body),
+  });
+
+  return {
+    status: response.status,
+    body: await response.json(),
+  };
 }
 
 function buildCallbackUrl(

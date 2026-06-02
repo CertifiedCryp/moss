@@ -128,6 +128,7 @@ pnpm e2e:loopback -- --management --mock-relay --reset \
   --wallet-url http://localhost:4000 \
   --relay-url http://127.0.0.1:4002/rpc
 pnpm e2e:loopback:relay-smoke
+pnpm e2e:device:relay-smoke
 ```
 
 Login should produce a profile with no delegated keys; create-key should
@@ -137,10 +138,19 @@ create-key, list, permissions, label, switch, and revoke. Use the local
 relay calls with the generated profile; it keeps those calls on the shim rather
 than production.
 
-The relay-smoke run uses the cached virtual WebAuthn profile under `.e2e`,
-creates or reuses a scoped `e2e-relay-smoke` key, and submits a real 0.0001
-USDM self-transfer. It must not be run with `--mock-relay`; the cached wallet
-needs enough USDM for the transfer and relay fee.
+The relay-smoke run uses a persistent virtual WebAuthn profile under
+`~/.mega/wallet-cli/e2e-relay-smoke`, creates or reuses a scoped
+`e2e-relay-smoke` key, and submits a real 0.0001 USDM self-transfer. It must
+not be run with `--mock-relay`; the cached wallet needs enough USDM for the
+transfer and relay fee. Do not pass `--reset` to relay-smoke runs. Delete that
+external directory manually only when intentionally replacing the funded smoke
+wallet.
+
+`pnpm e2e:device:relay-smoke` uses the same persistent funded wallet but
+creates or reuses a separate `e2e-relay-smoke-device` delegated key through the
+local shim's device-code endpoints. This is an internal E2E path only; device
+auth remains unsupported for normal CLI users until the real wallet backend
+flow is live.
 
 ## Permission Model
 

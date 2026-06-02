@@ -29,6 +29,7 @@ export type CliLoginUrlParams = {
   walletUrl: string;
   redirectUri: LoopbackRedirectUri;
   state: string;
+  requestId: string;
   network: Network;
   clientName: "mega-cli";
 };
@@ -39,6 +40,7 @@ export type CliAuthUrlParams = {
   permissions: string;
   redirectUri: LoopbackRedirectUri;
   state: string;
+  requestId: string;
   network: Network;
   clientName: "mega-cli";
 };
@@ -49,6 +51,7 @@ export type CliRevokeUrlParams = {
   feeToken?: string;
   redirectUri: LoopbackRedirectUri;
   state: string;
+  requestId: string;
   network: Network;
   clientName: "mega-cli";
 };
@@ -178,6 +181,36 @@ type LoopbackServer<TCallback> = {
   close: () => Promise<void>;
 };
 
+type LoopbackValidationRequest =
+  | {
+      operation: "login";
+      requestId: string;
+      state: string;
+      redirectUri: LoopbackRedirectUri;
+      network: Network;
+      clientName: "mega-cli";
+    }
+  | {
+      operation: "grant";
+      requestId: string;
+      state: string;
+      redirectUri: LoopbackRedirectUri;
+      network: Network;
+      clientName: "mega-cli";
+      accessAddress: HexString;
+      permissions: string;
+    }
+  | {
+      operation: "revoke";
+      requestId: string;
+      state: string;
+      redirectUri: LoopbackRedirectUri;
+      network: Network;
+      clientName: "mega-cli";
+      accessAddress: HexString;
+      feeToken?: string;
+    };
+
 type LoopbackRequestHandler<TCallback> = (
   request: IncomingMessage,
   response: ServerResponse,
@@ -186,16 +219,23 @@ type LoopbackRequestHandler<TCallback> = (
 
 type CallbackServerOptions = {
   state: string;
+  requestId: string;
   accessAddress: HexString;
+  allowedOrigin: string;
+  validationRequest: (redirectUri: LoopbackRedirectUri) => LoopbackValidationRequest;
   timeoutMs: number;
 };
 
 type LoginCallbackServerOptions = {
   state: string;
+  requestId: string;
+  allowedOrigin: string;
+  validationRequest: (redirectUri: LoopbackRedirectUri) => LoopbackValidationRequest;
   timeoutMs: number;
 };
 
 const callbackPath = "/callback";
+const validationPath = "/cli-auth/validate";
 const defaultTimeoutMs = 120_000;
 const stateBytes = 32;
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
@@ -247,8 +287,19 @@ export async function runLoopbackLogin(
   assertPositiveTimeout(timeoutMs);
 
   const state = options.state ?? createState();
+  const requestId = createRequestId();
   const callbackServer = await startLoopbackLoginCallbackServer({
     state,
+    requestId,
+    allowedOrigin: originFromUrl(walletUrl),
+    validationRequest: (redirectUri) => ({
+      operation: "login",
+      requestId,
+      state,
+      redirectUri,
+      network: options.network,
+      clientName: "mega-cli",
+    }),
     timeoutMs,
   });
 
@@ -256,6 +307,7 @@ export async function runLoopbackLogin(
     walletUrl,
     redirectUri: callbackServer.redirectUri,
     state,
+    requestId,
     network: options.network,
     clientName: "mega-cli",
   });
@@ -310,18 +362,33 @@ export async function authorizeLoopbackKey(
       ? generateDelegatedKeyPair()
       : deriveDelegatedKeyPair(options.privateKey);
   const state = options.state ?? createState();
+  const requestId = createRequestId();
+  const permissions = encodePermissions(options.permissionRequest);
   const callbackServer = await startLoopbackCallbackServer({
     state,
+    requestId,
     accessAddress: keyPair.accessAddress,
+    allowedOrigin: originFromUrl(walletUrl),
+    validationRequest: (redirectUri) => ({
+      operation: "grant",
+      requestId,
+      state,
+      redirectUri,
+      network: options.network,
+      clientName: "mega-cli",
+      accessAddress: keyPair.accessAddress,
+      permissions,
+    }),
     timeoutMs,
   });
 
   const authUrl = buildCliAuthUrl({
     walletUrl,
     accessAddress: keyPair.accessAddress,
-    permissions: encodePermissions(options.permissionRequest),
+    permissions,
     redirectUri: callbackServer.redirectUri,
     state,
+    requestId,
     network: options.network,
     clientName: "mega-cli",
   });
@@ -378,6 +445,7 @@ export function buildCliAuthUrl(params: CliAuthUrlParams): string {
   if (params.state.length < 16) {
     throw new CliError("state must be at least 16 characters");
   }
+  assertRequestId(params.requestId);
   if (params.permissions.length === 0) {
     throw new CliError("permissions are required");
   }
@@ -387,6 +455,7 @@ export function buildCliAuthUrl(params: CliAuthUrlParams): string {
   url.searchParams.set("permissions", params.permissions);
   url.searchParams.set("redirectUri", params.redirectUri);
   url.searchParams.set("state", params.state);
+  url.searchParams.set("requestId", params.requestId);
   url.searchParams.set("network", params.network);
   url.searchParams.set("clientName", params.clientName);
 
@@ -401,11 +470,13 @@ export function buildCliLoginUrl(params: CliLoginUrlParams): string {
   if (params.state.length < 16) {
     throw new CliError("state must be at least 16 characters");
   }
+  assertRequestId(params.requestId);
 
   const url = new URL("/cli-auth/loopback", params.walletUrl);
   url.searchParams.set("operation", "login");
   url.searchParams.set("redirectUri", params.redirectUri);
   url.searchParams.set("state", params.state);
+  url.searchParams.set("requestId", params.requestId);
   url.searchParams.set("network", params.network);
   url.searchParams.set("clientName", params.clientName);
 
@@ -421,9 +492,22 @@ export async function runLoopbackRevoke(
   assertPositiveTimeout(timeoutMs);
 
   const state = options.state ?? createState();
+  const requestId = createRequestId();
   const callbackServer = await startLoopbackRevokeCallbackServer({
     state,
+    requestId,
     accessAddress: options.accessAddress,
+    allowedOrigin: originFromUrl(walletUrl),
+    validationRequest: (redirectUri) => ({
+      operation: "revoke",
+      requestId,
+      state,
+      redirectUri,
+      network: options.network,
+      clientName: "mega-cli",
+      accessAddress: options.accessAddress,
+      ...(options.feeToken === undefined ? {} : { feeToken: options.feeToken }),
+    }),
     timeoutMs,
   });
 
@@ -433,6 +517,7 @@ export async function runLoopbackRevoke(
     feeToken: options.feeToken,
     redirectUri: callbackServer.redirectUri,
     state,
+    requestId,
     network: options.network,
     clientName: "mega-cli",
   });
@@ -480,6 +565,7 @@ export function buildCliRevokeUrl(params: CliRevokeUrlParams): string {
   if (params.state.length < 16) {
     throw new CliError("state must be at least 16 characters");
   }
+  assertRequestId(params.requestId);
 
   const url = new URL("/cli-auth/revoke", params.walletUrl);
   url.searchParams.set("accessAddress", params.accessAddress);
@@ -488,6 +574,7 @@ export function buildCliRevokeUrl(params: CliRevokeUrlParams): string {
   }
   url.searchParams.set("redirectUri", params.redirectUri);
   url.searchParams.set("state", params.state);
+  url.searchParams.set("requestId", params.requestId);
   url.searchParams.set("network", params.network);
   url.searchParams.set("clientName", params.clientName);
 
@@ -506,6 +593,8 @@ export async function startLoopbackCallbackServer(
   return startLoopbackServer({
     timeoutMs: options.timeoutMs,
     timeoutMessage: `wallet authorization timed out after ${options.timeoutMs}ms`,
+    allowedOrigin: options.allowedOrigin,
+    validationRequest: options.validationRequest,
     handleRequest: (request, response, settle) =>
       handleCallbackRequest(request, response, options, settle),
   });
@@ -519,6 +608,8 @@ export async function startLoopbackLoginCallbackServer(
   return startLoopbackServer({
     timeoutMs: options.timeoutMs,
     timeoutMessage: `wallet login timed out after ${options.timeoutMs}ms`,
+    allowedOrigin: options.allowedOrigin,
+    validationRequest: options.validationRequest,
     handleRequest: (request, response, settle) =>
       handleLoginCallbackRequest(request, response, options, settle),
   });
@@ -536,6 +627,8 @@ export async function startLoopbackRevokeCallbackServer(
   return startLoopbackServer({
     timeoutMs: options.timeoutMs,
     timeoutMessage: `wallet key revocation timed out after ${options.timeoutMs}ms`,
+    allowedOrigin: options.allowedOrigin,
+    validationRequest: options.validationRequest,
     handleRequest: (request, response, settle) =>
       handleRevokeCallbackRequest(request, response, options, settle),
   });
@@ -544,6 +637,8 @@ export async function startLoopbackRevokeCallbackServer(
 async function startLoopbackServer<TCallback>(options: {
   timeoutMs: number;
   timeoutMessage: string;
+  allowedOrigin: string;
+  validationRequest: (redirectUri: LoopbackRedirectUri) => LoopbackValidationRequest;
   handleRequest: LoopbackRequestHandler<TCallback>;
 }): Promise<LoopbackServer<TCallback>> {
   let settled = false;
@@ -556,7 +651,20 @@ async function startLoopbackServer<TCallback>(options: {
     rejectCallback = reject;
   });
 
+  let expectedValidationRequest: LoopbackValidationRequest | undefined;
+
   const server = createServer((request, response) => {
+    if (
+      handleValidationRequest(
+        request,
+        response,
+        expectedValidationRequest,
+        options.allowedOrigin,
+      )
+    ) {
+      return;
+    }
+
     options.handleRequest(request, response, (result) => {
       if (settled) {
         return;
@@ -592,8 +700,11 @@ async function startLoopbackServer<TCallback>(options: {
     throw new CliError("failed to start loopback callback server");
   }
 
+  const redirectUri = `http://127.0.0.1:${address.port}${callbackPath}` as const;
+  expectedValidationRequest = options.validationRequest(redirectUri);
+
   return {
-    redirectUri: `http://127.0.0.1:${address.port}${callbackPath}`,
+    redirectUri,
     waitForCallback,
     close: () =>
       new Promise<void>((resolve, reject) => {
@@ -981,6 +1092,201 @@ function handleRevokeCallbackRequest(
   }
 }
 
+function handleValidationRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  expected: LoopbackValidationRequest | undefined,
+  allowedOrigin: string,
+): boolean {
+  const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  if (url.pathname !== validationPath) {
+    return false;
+  }
+
+  const origin = request.headers.origin;
+  if (origin !== allowedOrigin) {
+    sendJson(response, 403, { error: "CLI validation origin is not allowed" });
+    return true;
+  }
+
+  setCorsHeaders(response, allowedOrigin);
+
+  if (request.method === "OPTIONS") {
+    response.statusCode = 204;
+    response.end();
+    return true;
+  }
+
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Method not allowed" });
+    return true;
+  }
+
+  if (!isLoopbackRemoteAddress(request.socket.remoteAddress)) {
+    sendJson(response, 403, { error: "Only loopback validation is allowed" });
+    return true;
+  }
+
+  if (!expected) {
+    sendJson(response, 503, { error: "CLI request is not ready" });
+    return true;
+  }
+
+  let body = "";
+  request.setEncoding("utf8");
+  request.on("data", (chunk: string) => {
+    body += chunk;
+    if (body.length > 256_000) {
+      request.destroy(new CliError("validation request is too large"));
+    }
+  });
+  request.on("error", () => {
+    if (!response.headersSent) {
+      sendJson(response, 400, { error: "Invalid validation request" });
+    }
+  });
+  request.on("end", () => {
+    try {
+      const actual = parseValidationRequest(JSON.parse(body));
+      if (!sameValidationRequest(actual, expected)) {
+        sendJson(response, 400, { error: "CLI request proof mismatch" });
+        return;
+      }
+
+      sendJson(response, 200, { status: "ok" });
+    } catch (error) {
+      sendJson(response, 400, {
+        error:
+          error instanceof Error ? error.message : "Invalid validation request",
+      });
+    }
+  });
+
+  return true;
+}
+
+function parseValidationRequest(value: unknown): LoopbackValidationRequest {
+  if (!isObject(value)) {
+    throw new CliError("validation request must be an object");
+  }
+
+  const requestId = requireStringField(value, "requestId");
+  assertRequestId(requestId);
+
+  const state = requireStringField(value, "state");
+  if (state.length < 16) {
+    throw new CliError("validation state must be at least 16 characters");
+  }
+
+  const redirectUri = requireStringField(value, "redirectUri");
+  assertLoopbackRedirectUri(redirectUri);
+
+  const network = requireStringField(value, "network");
+  if (!isNetwork(network)) {
+    throw new CliError(`unsupported network: ${network}`);
+  }
+
+  const clientName = requireStringField(value, "clientName");
+  if (clientName !== "mega-cli") {
+    throw new CliError("validation clientName is invalid");
+  }
+
+  const operation = requireStringField(value, "operation");
+  if (operation === "login") {
+    return {
+      operation,
+      requestId,
+      state,
+      redirectUri,
+      network,
+      clientName,
+    };
+  }
+
+  if (operation === "grant") {
+    const accessAddress = requireAddressField(value, "accessAddress");
+    const permissions = requireStringField(value, "permissions");
+    if (permissions.length === 0) {
+      throw new CliError("validation permissions are required");
+    }
+    return {
+      operation,
+      requestId,
+      state,
+      redirectUri,
+      network,
+      clientName,
+      accessAddress,
+      permissions,
+    };
+  }
+
+  if (operation === "revoke") {
+    const feeToken =
+      "feeToken" in value && value.feeToken !== undefined
+        ? requireStringField(value, "feeToken")
+        : undefined;
+    return {
+      operation,
+      requestId,
+      state,
+      redirectUri,
+      network,
+      clientName,
+      accessAddress: requireAddressField(value, "accessAddress"),
+      ...(feeToken === undefined ? {} : { feeToken }),
+    };
+  }
+
+  throw new CliError("validation operation is invalid");
+}
+
+function sameValidationRequest(
+  actual: LoopbackValidationRequest,
+  expected: LoopbackValidationRequest,
+): boolean {
+  return (
+    canonicalValidationRequest(actual) === canonicalValidationRequest(expected)
+  );
+}
+
+function canonicalValidationRequest(request: LoopbackValidationRequest): string {
+  if (request.operation === "login") {
+    return JSON.stringify({
+      operation: request.operation,
+      requestId: request.requestId,
+      state: request.state,
+      redirectUri: request.redirectUri,
+      network: request.network,
+      clientName: request.clientName,
+    });
+  }
+
+  if (request.operation === "grant") {
+    return JSON.stringify({
+      operation: request.operation,
+      requestId: request.requestId,
+      state: request.state,
+      redirectUri: request.redirectUri,
+      network: request.network,
+      clientName: request.clientName,
+      accessAddress: request.accessAddress.toLowerCase(),
+      permissions: request.permissions,
+    });
+  }
+
+  return JSON.stringify({
+    operation: request.operation,
+    requestId: request.requestId,
+    state: request.state,
+    redirectUri: request.redirectUri,
+    network: request.network,
+    clientName: request.clientName,
+    accessAddress: request.accessAddress.toLowerCase(),
+    ...(request.feeToken === undefined ? {} : { feeToken: request.feeToken }),
+  });
+}
+
 function parseAuthorizedKey(value: string | null): AuthorizedKey {
   if (!value) {
     throw new CliError("approved callback missing authorizedKey");
@@ -1151,6 +1457,42 @@ function createState(): string {
   return randomBytes(stateBytes).toString("base64url");
 }
 
+function createRequestId(): string {
+  return randomBytes(stateBytes).toString("base64url");
+}
+
+function originFromUrl(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    throw new CliError("walletUrl must be a valid URL");
+  }
+}
+
+function assertRequestId(value: string): void {
+  if (value.length < 16) {
+    throw new CliError("requestId must be at least 16 characters");
+  }
+}
+
+function requireStringField(value: Record<string, unknown>, name: string): string {
+  const field = value[name];
+  if (typeof field !== "string" || field.length === 0) {
+    throw new CliError(`validation ${name} is required`);
+  }
+
+  return field;
+}
+
+function requireAddressField(
+  value: Record<string, unknown>,
+  name: string,
+): HexString {
+  const field = requireStringField(value, name);
+  assertAddress(field, `validation ${name} must be a 20-byte hex address`);
+  return field as HexString;
+}
+
 function requireParam(params: URLSearchParams, name: string): string {
   const value = params.get(name);
   if (value === null || value.length === 0) {
@@ -1248,4 +1590,24 @@ function sendText(
     connection: "close",
   });
   response.end(`${body}\n`);
+}
+
+function sendJson(
+  response: ServerResponse,
+  statusCode: number,
+  payload: Record<string, unknown>,
+): void {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  response.end(JSON.stringify(payload));
+}
+
+function setCorsHeaders(response: ServerResponse, allowedOrigin: string): void {
+  response.setHeader("access-control-allow-origin", allowedOrigin);
+  response.setHeader("vary", "Origin");
+  response.setHeader("access-control-allow-methods", "POST, OPTIONS");
+  response.setHeader("access-control-allow-headers", "content-type");
+  response.setHeader("access-control-max-age", "60");
 }
