@@ -225,7 +225,7 @@ describe("wallet execute", () => {
         }),
       ),
     ).rejects.toThrow(
-      "wallet profile has no delegated keys; run mega wallet create-key",
+      "wallet profile has no delegated keys; run mega moss create-key",
     );
 
     expect(relayActions.sendCalls).not.toHaveBeenCalled();
@@ -338,7 +338,7 @@ describe("wallet execute", () => {
     const stdout = memoryOutput();
     const program = new Command();
     program.exitOverride();
-    const wallet = program.command("wallet");
+    const wallet = program.command("moss");
     registerExecuteCommand(
       wallet,
       dependencies({
@@ -350,7 +350,7 @@ describe("wallet execute", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "execute",
       "--calls",
       callsPath,
@@ -368,7 +368,7 @@ async function runRegisteredExecute(
 ): Promise<void> {
   const program = new Command();
   program.exitOverride();
-  const wallet = program.command("wallet");
+  const wallet = program.command("moss");
   registerExecuteCommand(
     wallet,
     dependencies({
@@ -380,7 +380,7 @@ async function runRegisteredExecute(
   await program.parseAsync([
     "node",
     "mega",
-    "wallet",
+    "moss",
     "execute",
     ...args,
     "--poll-interval-ms",

@@ -208,7 +208,7 @@ describe("wallet profile storage", () => {
     await expect(deleteWalletProfile("mainnet", env)).resolves.toBe(true);
     await expect(deleteWalletProfile("mainnet", env)).resolves.toBe(false);
     await expect(readWalletProfile("mainnet", env)).rejects.toThrow(
-      "run mega wallet login",
+      "run mega moss login",
     );
   });
 });

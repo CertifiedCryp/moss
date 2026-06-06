@@ -387,6 +387,6 @@ if [ "$dry_run" -eq 0 ]; then
   echo "  release: $release_dir"
   echo "  mega:    $bin_dir/mega"
   if ! path_contains "$bin_dir"; then
-    echo "add $bin_dir to PATH to run mega wallet commands without an absolute path"
+    echo "add $bin_dir to PATH to run mega moss commands without an absolute path"
   fi
 fi

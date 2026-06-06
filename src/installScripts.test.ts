@@ -154,7 +154,7 @@ describe("installer scripts", () => {
       "utf8",
     );
 
-    expect(codexSkill).toContain("mega wallet");
+    expect(codexSkill).toContain("mega moss");
     expect(claudeSkill).toBe(codexSkill);
     expect(codexPermissionsReference).toContain("Permission Requests");
     expect(claudePermissionsReference).toBe(codexPermissionsReference);

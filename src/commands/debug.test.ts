@@ -151,7 +151,7 @@ describe("wallet debug", () => {
         },
       ),
     ).rejects.toThrow(
-      "wallet profile has no delegated keys; run mega wallet create-key",
+      "wallet profile has no delegated keys; run mega moss create-key",
     );
   });
 
@@ -178,7 +178,7 @@ describe("wallet debug", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "debug",
       "--skip-chain",
       "-t",
@@ -196,7 +196,7 @@ describe("wallet debug", () => {
     await writeWalletProfile(profile, env);
     const program = new Command();
     program.exitOverride();
-    const wallet = program.command("wallet");
+    const wallet = program.command("moss");
 
     registerDebugCommand(wallet, {
       env,
@@ -207,7 +207,7 @@ describe("wallet debug", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "debug",
       "--skip-chain",
       "-t",

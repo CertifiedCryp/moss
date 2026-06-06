@@ -396,7 +396,7 @@ async function runWriteTests(profile, fixtures) {
       [
         "active profile is missing write scopes:",
         ...missing.map((scope) => `  ${scope}`),
-        "Run mega wallet create-key with the required --allow-call flags.",
+        "Run mega moss create-key with the required --allow-call flags.",
       ].join("\n"),
     );
   });
@@ -616,7 +616,7 @@ async function exerciseLogoutWithoutTouchingActiveProfile(configDir) {
 
 async function wallet(args, runOptions = {}) {
   const env = runOptions.env ?? configEnv(options.configDir);
-  return run([process.execPath, distCli, "wallet", ...args], {
+  return run([process.execPath, distCli, "moss", ...args], {
     env,
     expectCode: runOptions.expectCode ?? 0,
   });

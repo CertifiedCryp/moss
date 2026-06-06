@@ -6,22 +6,22 @@ task unless a small adjacent test or documentation update is required.
 
 ## Product Shape
 
-The user-facing command shape is `mega wallet <command>`. Examples,
+The user-facing command shape is `mega moss <command>`. Examples,
 agent-facing docs, and user-facing recovery messages should teach
-`mega wallet ...`; do not teach or rely on a standalone `wallet` command.
+`mega moss ...`; do not teach or rely on a standalone `wallet` command.
 
 Core commands:
 
-- `mega wallet login`: connect the local wallet account profile through loopback authorization.
-- `mega wallet whoami`: show the active account, delegated key, expiry, and limits.
-- `mega wallet list`: list locally known delegated/access keys and approved limits.
-- `mega wallet permissions`: show a key's approved scope and on-chain spend remaining. The stored spend request is not the same thing as live remaining capacity; use `spendInfos[].remaining` when judging whether another execution can fit.
-- `mega wallet call`: read-only `eth_call`; does not use the relay for writes.
-- `mega wallet execute`: submit state-changing calls through the MegaETH/Porto relay.
-- `mega wallet transfer`: convenience wrapper over `execute`.
-- `mega wallet fund`: open the wallet deposit flow for the active account.
-- `mega wallet debug`: inspect local profile, balance, and relay key status without private key output.
-- `mega wallet logout`: delete the local profile and delegated private key material; it does not revoke on-chain.
+- `mega moss login`: connect the local wallet account profile through loopback authorization.
+- `mega moss whoami`: show the active account, delegated key, expiry, and limits.
+- `mega moss list`: list locally known delegated/access keys and approved limits.
+- `mega moss permissions`: show a key's approved scope and on-chain spend remaining. The stored spend request is not the same thing as live remaining capacity; use `spendInfos[].remaining` when judging whether another execution can fit.
+- `mega moss call`: read-only `eth_call`; does not use the relay for writes.
+- `mega moss execute`: submit state-changing calls through the MegaETH/Porto relay.
+- `mega moss transfer`: convenience wrapper over `execute`.
+- `mega moss fund`: open the wallet deposit flow for the active account.
+- `mega moss debug`: inspect local profile, balance, and relay key status without private key output.
+- `mega moss logout`: delete the local profile and delegated private key material; it does not revoke on-chain.
 
 Mainnet is the default network. Testnet is supported with `--network testnet`
 and uses a separate local profile path plus testnet chain/token defaults.
@@ -62,7 +62,7 @@ profiles, private keys, or auth material.
 
 ## Architecture
 
-`mega wallet login` defaults to a native-app loopback flow:
+`mega moss login` defaults to a native-app loopback flow:
 
 1. The CLI opens MegaETH Wallet at `/cli-auth/loopback` with `operation=login`,
    a high-entropy `state`, and a loopback `redirectUri`.
@@ -74,19 +74,19 @@ profiles, private keys, or auth material.
    private key material.
 
 Login is a profile bootstrap command. If a profile already exists, it must fail
-before browser auth and direct the user to either `mega wallet logout` or
-`mega wallet create-key`. Use `create-key` to add delegated keys to an existing
+before browser auth and direct the user to either `mega moss logout` or
+`mega moss create-key`. Use `create-key` to add delegated keys to an existing
 wallet profile.
 
-`mega wallet create-key` is the delegated-key grant flow. It generates the
+`mega moss create-key` is the delegated-key grant flow. It generates the
 secp256k1 private key locally, opens MegaETH Wallet with the delegated public
 address and requested permissions, validates the callback state/account, and
 persists the private key only after approval.
 
 If `create-key` fails because the authorized wallet account does not match the
-local profile, treat it as a browser-wallet mismatch. Run `mega wallet whoami`
+local profile, treat it as a browser-wallet mismatch. Run `mega moss whoami`
 to identify the expected account, then direct the user to switch the browser
-wallet/profile to that account or intentionally `mega wallet logout` and log in
+wallet/profile to that account or intentionally `mega moss logout` and log in
 again with the desired wallet. Failed mismatched authorizations must not be
 stored locally.
 
@@ -211,7 +211,7 @@ explicit in prompt/UI copy, avoid ambiguous empty or omitted permissions, and
 update `README.md`, `SKILL.md`, tests, and this file together when changing the
 default.
 
-`mega wallet create-key --spend-limit <token_address>:<amount>:<period>` adds a
+`mega moss create-key --spend-limit <token_address>:<amount>:<period>` adds a
 workflow spend row to the new key request. It accepts only 20-byte token
 addresses; use `0x0000000000000000000000000000000000000000` for native ETH.
 Amount is a human token amount, and period must be `minute`, `hour`, `day`,
@@ -219,7 +219,7 @@ Amount is a human token amount, and period must be `minute`, `hour`, `day`,
 or `--permissions` to define executable call scope. Use a full `--permissions`
 file for custom expiry or no-spend requests.
 
-`mega wallet create-key --fee-token <symbol> [--fee-limit <amount>]` changes
+`mega moss create-key --fee-token <symbol> [--fee-limit <amount>]` changes
 the preferred relay fee token for the new key and adds the fee buffer to the
 matching spend permission. If either fee option is present and no
 `--spend-limit` is supplied, the CLI does not add the default USDM workflow
@@ -241,7 +241,7 @@ When adding or changing wallet commands, update the command unit tests in
 `src/commands/*.test.ts`, the shared helpers they depend on, `README.md`,
 `SKILL.md`, and this file in the same commit. New user-facing commands must be
 wired through `registerWalletCommands` and tested through the canonical
-`mega wallet <command>` shape.
+`mega moss <command>` shape.
 
 For mainnet command-level regression checks, use:
 
@@ -272,7 +272,7 @@ has enough USDM to cover relay fees. Add
 - Keep profile files private to the local user when implementing storage.
 - The local profile contains delegated private key material. Preserve `0600`
   file permissions and redact profile contents in logs, errors, tests, and docs.
-- Treat `mega wallet logout` as a destructive local forget operation: it deletes
+- Treat `mega moss logout` as a destructive local forget operation: it deletes
   the local profile and delegated private key material without revoking the
   on-chain key authorization.
 - Do not construct JSON or calldata by string concatenation for wallet or relay

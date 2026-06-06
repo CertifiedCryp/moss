@@ -6,7 +6,7 @@ uses delegated session keys for writes. Login stores the wallet account profile;
 for passkey approval, receives public approval metadata, and stores the
 approved private key material on the same machine.
 
-Use `mega wallet <command>` as the command shape.
+Use `mega moss <command>` as the command shape.
 
 Human output is formatted for terminal use and may include color when attached
 to a TTY. Login may also print a short terminal intro and browser fallback URL
@@ -54,20 +54,20 @@ installs.
 ## Login
 
 ```bash
-mega wallet login
+mega moss login
 ```
 
 Login opens MegaETH Wallet at `https://account.megaeth.com`, asks the passkey
 wallet to connect the account, and stores the local profile. It does not create
-a delegated key. Create a scoped key with `mega wallet create-key` before
+a delegated key. Create a scoped key with `mega moss create-key` before
 state-changing wallet writes.
 
 Mainnet is the default network. Pass `--network testnet` to use the separate
 testnet profile and chain config:
 
 ```bash
-mega wallet login --network testnet
-mega wallet whoami --network testnet
+mega moss login --network testnet
+mega moss whoami --network testnet
 ```
 
 Browser authorization uses same-machine loopback. The browser and CLI process
@@ -84,7 +84,7 @@ used by the CLI as a convenience to add or merge that fee-token spend capacity
 when the token is known.
 
 If a profile already exists, `login` exits before opening the browser. Use
-`mega wallet create-key` to add a delegated key, or `mega wallet logout` to
+`mega moss create-key` to add a delegated key, or `mega moss logout` to
 forget the local profile.
 
 ## Keys
@@ -92,24 +92,24 @@ forget the local profile.
 Inspect the active account and default delegated key:
 
 ```bash
-mega wallet whoami
-mega wallet whoami --json
+mega moss whoami
+mega moss whoami --json
 ```
 
 List locally known delegated keys:
 
 ```bash
-mega wallet list
-mega wallet list --show-inactive
+mega moss list
+mega moss list --show-inactive
 ```
 
 Show a key's approved scope:
 
 ```bash
-mega wallet permissions 0xKEY_OR_ACCESS_ADDRESS
+mega moss permissions 0xKEY_OR_ACCESS_ADDRESS
 ```
 
-Use the full key id or `accessAddress`; `mega wallet list --json` prints both.
+Use the full key id or `accessAddress`; `mega moss list --json` prints both.
 `permissions` also fetches current on-chain spend remaining when RPC is
 available. In JSON, `authorizedKey.permissions.spend` is the stored request;
 `spendInfos[].remaining` is the live remaining capacity.
@@ -117,10 +117,10 @@ available. In JSON, `authorizedKey.permissions.spend` is the stored request;
 Create a new scoped delegated key:
 
 ```bash
-mega wallet create-key \
+mega moss create-key \
   --allow-call '0xfafddbb3fc7688494971a79cc65dca3ef82079e7:transfer(address,uint256)' \
   --label "usdm-transfer"
-mega wallet create-key \
+mega moss create-key \
   --spend-limit 0xfafddbb3fc7688494971a79cc65dca3ef82079e7:25:week \
   --allow-call '0xfafddbb3fc7688494971a79cc65dca3ef82079e7:transfer(address,uint256)'
 ```
@@ -142,15 +142,15 @@ no-spend, custom call scope, or multi-contract scopes.
 Switch or label local keys:
 
 ```bash
-mega wallet switch 0xKEY_OR_ACCESS_ADDRESS
-mega wallet label 0xKEY_OR_ACCESS_ADDRESS "agent"
+mega moss switch 0xKEY_OR_ACCESS_ADDRESS
+mega moss label 0xKEY_OR_ACCESS_ADDRESS "agent"
 ```
 
 Revoke a delegated key on-chain:
 
 ```bash
-mega wallet revoke 0xKEY_OR_ACCESS_ADDRESS
-mega wallet revoke 0xKEY_OR_ACCESS_ADDRESS --fee-token USDm
+mega moss revoke 0xKEY_OR_ACCESS_ADDRESS
+mega moss revoke 0xKEY_OR_ACCESS_ADDRESS --fee-token USDm
 ```
 
 `revoke` opens MegaETH Wallet for passkey confirmation. After success, the CLI
@@ -164,7 +164,7 @@ token; override with `--fee-token` when that token has insufficient balance.
 Use `call` for read-only `eth_call` workflows:
 
 ```bash
-mega wallet call \
+mega moss call \
   --to 0x1234567890abcdef1234567890abcdef12345678 \
   --data 0x
 ```
@@ -172,7 +172,7 @@ mega wallet call \
 ABI mode is also supported:
 
 ```bash
-mega wallet call \
+mega moss call \
   --to 0x1234567890abcdef1234567890abcdef12345678 \
   --abi ./erc20.json \
   --function balanceOf \
@@ -186,7 +186,7 @@ mega wallet call \
 Use `execute` for state-changing calls through the MegaETH/Porto relay:
 
 ```bash
-mega wallet execute \
+mega moss execute \
   --to 0x1234567890abcdef1234567890abcdef12345678 \
   --data 0x \
   --value 0
@@ -195,13 +195,13 @@ mega wallet execute \
 For multiple calls:
 
 ```bash
-mega wallet execute --calls ./calls.json
+mega moss execute --calls ./calls.json
 ```
 
 For a selected stored key:
 
 ```bash
-mega wallet execute --key 0xKEY_OR_ACCESS_ADDRESS --calls ./calls.json
+mega moss execute --key 0xKEY_OR_ACCESS_ADDRESS --calls ./calls.json
 ```
 
 Spend permission is not call permission. Empty call permissions create keys
@@ -219,7 +219,7 @@ spend scopes cover the requested operation.
 Native ETH:
 
 ```bash
-mega wallet transfer \
+mega moss transfer \
   --to 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd \
   --amount 0.1
 ```
@@ -227,7 +227,7 @@ mega wallet transfer \
 ERC20:
 
 ```bash
-mega wallet transfer \
+mega moss transfer \
   --token 0x1234567890abcdef1234567890abcdef12345678 \
   --to 0xabcdefabcdefabcdefabcdefabcdefabcdefabcd \
   --amount 100
@@ -241,20 +241,20 @@ explicit override is needed.
 Open the wallet deposit flow:
 
 ```bash
-mega wallet fund
+mega moss fund
 ```
 
 Inspect local profile health without printing private key material:
 
 ```bash
-mega wallet debug
-mega wallet debug --skip-chain --json
+mega moss debug
+mega moss debug --skip-chain --json
 ```
 
 For complete options on any command, use:
 
 ```bash
-mega wallet <command> --help
+mega moss <command> --help
 ```
 
 ## Development

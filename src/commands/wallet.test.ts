@@ -39,7 +39,7 @@ describe("wallet status commands", () => {
 
     await expect(
       runWalletWhoami({ network: "mainnet" }, { env, stdout: memoryOutput() }),
-    ).rejects.toThrow("no mainnet wallet profile found; run mega wallet login");
+    ).rejects.toThrow("no mainnet wallet profile found; run mega moss login");
   });
 
   it("shows the recovery command when a profile has no delegated keys", async () => {
@@ -66,7 +66,7 @@ describe("wallet status commands", () => {
         "Network: mainnet",
         "Account: 0x1111111111111111111111111111111111111111",
         "",
-        "Next: mega wallet create-key",
+        "Next: mega moss create-key",
         "",
       ].join("\n"),
     );
@@ -102,7 +102,7 @@ describe("wallet status commands", () => {
         { env },
       ),
     ).rejects.toThrow(
-      "Wallet already connected to 0x1111...1111. Either logout with `mega wallet logout` or add a key to the existing wallet profile with `mega wallet create-key`.",
+      "Wallet already connected to 0x1111...1111. Either logout with `mega moss logout` or add a key to the existing wallet profile with `mega moss create-key`.",
     );
   });
 
@@ -708,7 +708,7 @@ describe("wallet status commands", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "create-key",
       "--spend-limit",
       "0xfafddbb3fc7688494971a79cc65dca3ef82079e7:12.5:week",
@@ -759,7 +759,7 @@ describe("wallet status commands", () => {
 
     expect(stdout.text).toContain(`Access address: ${created.accessAddress}`);
     expect(stdout.text).toContain(
-      `Next: mega wallet permissions ${created.accessAddress}`,
+      `Next: mega moss permissions ${created.accessAddress}`,
     );
   });
 
@@ -801,7 +801,7 @@ describe("wallet status commands", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "create-key",
       "--spend-limit",
       "0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb:0.25:day",
@@ -859,7 +859,7 @@ describe("wallet status commands", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "create-key",
       "--spend-limit",
       "0xfafddbb3fc7688494971a79cc65dca3ef82079e7:12.5:week",
@@ -914,7 +914,7 @@ describe("wallet status commands", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "create-key",
       "--fee-token",
       "USDT0",
@@ -965,7 +965,7 @@ describe("wallet status commands", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "create-key",
       "--network",
       "testnet",
@@ -1020,7 +1020,7 @@ describe("wallet status commands", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "login",
       "--wallet-url",
       "https://wallet.example",
@@ -1080,7 +1080,7 @@ describe("wallet status commands", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "login",
       "--wallet-url",
       "https://wallet.example",
@@ -1122,7 +1122,7 @@ describe("wallet status commands", () => {
     const pending = program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "login",
       "--wallet-url",
       "https://wallet.example",
@@ -1301,7 +1301,7 @@ describe("wallet status commands", () => {
     expect(stdout.text).toBe("mainnet\tremoved\n");
     await expect(profileExists("mainnet", env)).resolves.toBe(false);
     await expect(readWalletProfile("mainnet", env)).rejects.toThrow(
-      "run mega wallet login",
+      "run mega moss login",
     );
   });
 
@@ -1319,7 +1319,7 @@ describe("wallet status commands", () => {
       stdout,
     });
 
-    await program.parseAsync(["node", "mega", "wallet", "whoami", "-t"]);
+    await program.parseAsync(["node", "mega", "moss", "whoami", "-t"]);
 
     expect(stdout.text).toBe(
       `mainnet\t${profile.accountAddress}\t${profile.keys[0]!.accessAddress}\tactive\t${profile.keys[0]!.authorizedKey.expiry}\n`,

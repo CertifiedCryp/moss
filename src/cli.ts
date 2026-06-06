@@ -10,7 +10,7 @@ export function createCli(): Command {
 
   program
     .name(commandName)
-    .description("MegaETH wallet CLI")
+    .description("MegaETH MOSS account CLI")
     .version("0.1.0")
     .showHelpAfterError()
     .exitOverride();

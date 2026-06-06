@@ -268,7 +268,7 @@ describe("wallet transfer", () => {
     const stdout = memoryOutput();
     const program = new Command();
     program.exitOverride();
-    const wallet = program.command("wallet");
+    const wallet = program.command("moss");
 
     registerTransferCommand(
       wallet,
@@ -284,7 +284,7 @@ describe("wallet transfer", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "transfer",
       "--network",
       "testnet",
@@ -325,7 +325,7 @@ describe("wallet transfer", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "transfer",
       "--to",
       recipient,

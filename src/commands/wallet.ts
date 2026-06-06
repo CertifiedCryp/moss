@@ -197,8 +197,8 @@ export function registerWalletCommands(
   dependencies: WalletCommandDependencies = {},
 ): void {
   const wallet = program
-    .command("wallet")
-    .description("Manage MegaETH wallet workflows");
+    .command("moss")
+    .description("Manage MOSS account workflows");
 
   registerWalletSubcommands(wallet, dependencies);
 }
@@ -321,11 +321,11 @@ export function registerWalletSubcommands(
       "afterAll",
       `
 Examples:
-  mega wallet create-key \\
+  mega moss create-key \\
     --spend-limit 0xfafddbb3fc7688494971a79cc65dca3ef82079e7:25:week \\
     --allow-call 0xfafddbb3fc7688494971a79cc65dca3ef82079e7:transfer(address,uint256)
 
-  mega wallet create-key \\
+  mega moss create-key \\
     --spend-limit 0x0000000000000000000000000000000000000000:0.01:week \\
     --allow-call 0x4200000000000000000000000000000000000006:deposit()
 `,
@@ -414,7 +414,7 @@ export async function login(
   if (await profileExists(network, dependencies.env)) {
     const profile = await readWalletProfile(network, dependencies.env);
     throw new CliError(
-      `Wallet already connected to ${compactAddress(profile.accountAddress)}. Either logout with \`mega wallet logout\` or add a key to the existing wallet profile with \`mega wallet create-key\`.`,
+      `Wallet already connected to ${compactAddress(profile.accountAddress)}. Either logout with \`mega moss logout\` or add a key to the existing wallet profile with \`mega moss create-key\`.`,
     );
   }
 
@@ -871,7 +871,7 @@ function renderLogin(
       style,
     ),
     "",
-    "No delegated key was created. Run mega wallet create-key with explicit call scopes before write operations.",
+    "No delegated key was created. Run mega moss create-key with explicit call scopes before write operations.",
   ]
     .join("\n")
     .concat("\n");
@@ -904,7 +904,7 @@ function renderWhoami(
           style,
         ),
         "",
-        "Next: mega wallet create-key",
+        "Next: mega moss create-key",
       ]
         .join("\n")
         .concat("\n");
@@ -921,7 +921,7 @@ function renderWhoami(
         style,
       ),
       "",
-      "Next: mega wallet list --show-inactive, then mega wallet switch <key> or mega wallet create-key",
+      "Next: mega moss list --show-inactive, then mega moss switch <key> or mega moss create-key",
     ]
       .join("\n")
       .concat("\n");
@@ -1175,7 +1175,7 @@ function renderCreateKey(
     ),
     "",
     "This key is now the default for write operations.",
-    `Next: mega wallet permissions ${result.key.accessAddress}`,
+    `Next: mega moss permissions ${result.key.accessAddress}`,
   ]
     .join("\n")
     .concat("\n");

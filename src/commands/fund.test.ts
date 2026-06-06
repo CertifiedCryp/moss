@@ -85,7 +85,7 @@ describe("wallet fund", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "fund",
       "--no-open",
       "-t",
@@ -103,7 +103,7 @@ describe("wallet fund", () => {
     await writeWalletProfile(profile, env);
     const program = new Command();
     program.exitOverride();
-    const wallet = program.command("wallet");
+    const wallet = program.command("moss");
 
     registerFundCommand(wallet, {
       env,
@@ -114,7 +114,7 @@ describe("wallet fund", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "fund",
       "--no-open",
       "-t",

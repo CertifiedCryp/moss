@@ -236,7 +236,7 @@ describe("wallet call", () => {
     const stdout = memoryOutput();
     const program = new Command();
     program.exitOverride();
-    const wallet = program.command("wallet");
+    const wallet = program.command("moss");
     registerCallCommand(wallet, {
       createClient: () => client,
       stdout,
@@ -245,7 +245,7 @@ describe("wallet call", () => {
     await program.parseAsync([
       "node",
       "mega",
-      "wallet",
+      "moss",
       "call",
       "--to",
       target,

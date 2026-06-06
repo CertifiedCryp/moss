@@ -7,7 +7,7 @@ For a simple default USDM spend cap on a new key, pair `--spend-limit` with the
 workflow's explicit call scope:
 
 ```bash
-mega wallet create-key \
+mega moss create-key \
   --spend-limit 0xfafddbb3fc7688494971a79cc65dca3ef82079e7:25:week \
   --allow-call '0xfafddbb3fc7688494971a79cc65dca3ef82079e7:transfer(address,uint256)'
 ```
@@ -89,10 +89,10 @@ the inner `permissions` object:
 - `permissions.calls` is required and must contain at least one entry. Do not
   omit it or use `permissions.calls: []`; both produce unusable or rejected
   write keys.
-- Each call entry must include both `to` and `signature`. Prefer
+- Each call entry must include both `to` and `signature`. Use canonical
   human-readable function signatures, such as `transfer(address,uint256)` or
-  `supply(address,uint256,address,uint16)`, over 4-byte hex selectors; use a
-  selector only when the full function signature is unavailable.
+  `supply(address,uint256,address,uint16)`. Do not use raw 4-byte selectors,
+  wildcard selectors, or sentinel selector values for delegated-key scopes.
 - Tuple parameters use standard ABI notation with nested parentheses, such as
   `exactOutputSingle((address,address,uint24,address,uint256,uint256,uint160))`.
   Use canonical signatures without parameter names or spaces, and verify complex

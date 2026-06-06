@@ -12,14 +12,14 @@ describe("mega cli", () => {
     const help = createCli().helpInformation();
 
     expect(help).toContain("Usage: mega");
-    expect(help).toContain("MegaETH wallet CLI");
-    expect(help).toContain("wallet");
+    expect(help).toContain("MegaETH MOSS account CLI");
+    expect(help).toContain("moss");
   });
 
   it("renders create-key examples in help", () => {
     const program = createCli();
     const wallet = program.commands.find(
-      (command) => command.name() === "wallet",
+      (command) => command.name() === "moss",
     );
     const createKey = wallet?.commands.find(
       (command) => command.name() === "create-key",
@@ -51,7 +51,7 @@ describe("mega cli", () => {
     );
 
     expect(stdout).toContain("Usage: mega");
-    expect(stdout).toContain("MegaETH wallet CLI");
-    expect(stdout).toContain("wallet");
+    expect(stdout).toContain("MegaETH MOSS account CLI");
+    expect(stdout).toContain("moss");
   });
 });

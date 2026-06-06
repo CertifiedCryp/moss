@@ -129,7 +129,7 @@ export async function readWalletProfile(
   } catch (error) {
     if (isNodeError(error, "ENOENT")) {
       throw new CliError(
-        `no ${network} wallet profile found; run mega wallet login`,
+        `no ${network} wallet profile found; run mega moss login`,
       );
     }
 
@@ -272,7 +272,7 @@ export function requireUsableWalletKey(
           ? "expired"
           : "missing private key material";
     throw new CliError(
-      `delegated key ${key.accessAddress} is ${status}; run mega wallet create-key or switch to another usable key`,
+      `delegated key ${key.accessAddress} is ${status}; run mega moss create-key or switch to another usable key`,
     );
   }
 
@@ -281,10 +281,10 @@ export function requireUsableWalletKey(
 
 function noDefaultWalletKeyMessage(profile: WalletProfile): string {
   if (profile.keys.length === 0) {
-    return "wallet profile has no delegated keys; run mega wallet create-key";
+    return "wallet profile has no delegated keys; run mega moss create-key";
   }
 
-  return "wallet profile has no usable default delegated key; run mega wallet list --show-inactive, then mega wallet switch <key> or mega wallet create-key";
+  return "wallet profile has no usable default delegated key; run mega moss list --show-inactive, then mega moss switch <key> or mega moss create-key";
 }
 
 export function markWalletKeyUsed(
@@ -412,7 +412,7 @@ export function parseWalletProfile(value: unknown): WalletProfile {
     "authorizedKey" in profile
   ) {
     throw new CliError(
-      "wallet profile format changed; run mega wallet login again",
+      "wallet profile format changed; run mega moss login again",
     );
   }
   assertString(profile.network, "wallet profile network is required");
