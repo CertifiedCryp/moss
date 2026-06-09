@@ -34,13 +34,25 @@ command results belong on stdout.
 
 ## Distribution
 
-The local install path is repo-owned and deterministic:
+The release install path is repo-owned and deterministic:
 
-- `scripts/install.sh` builds the CLI, installs a versioned release under
-  `~/.mega/wallet-cli/releases/`, updates `~/.mega/wallet-cli/current`, and
-  writes the `mega` wrapper into `~/.local/bin` by default. It should remove any
-  repo-owned legacy `wallet` wrapper so stale compatibility shortcuts do not
-  remain on PATH.
+- `scripts/install-release.sh` is the public installer intended to be served at
+  `https://account.megaeth.com/install`. It downloads the latest GitHub Release
+  archive, verifies its `.sha256` checksum, installs a versioned release under
+  `~/.mega/wallet-cli/releases/`, updates `~/.mega/wallet-cli/current`, writes
+  the `mega` wrapper into `~/.local/bin` by default, removes repo-owned legacy
+  `wallet` wrappers, and installs the bundled skill unless `--no-skill` is
+  passed. It must not require pnpm or a source checkout.
+- `scripts/package-release.sh` builds the self-contained GitHub Release assets:
+  `mega-wallet-cli-<tag>.tar.gz` plus `.sha256`. The archive must include
+  `dist/`, production `node_modules/`, `package.json`, `pnpm-lock.yaml`,
+  `SKILL.md`, `references/`, and `scripts/install-skill.sh` so the public
+  installer can install CLI and skill without building from source.
+- `scripts/install.sh` is the local checkout installer. It builds the CLI,
+  installs a versioned release under `~/.mega/wallet-cli/releases/`, updates
+  `~/.mega/wallet-cli/current`, and writes the `mega` wrapper into `~/.local/bin`
+  by default. It should remove any repo-owned legacy `wallet` wrapper so stale
+  compatibility shortcuts do not remain on PATH.
   It must check Node.js `>=22` and pnpm before building. Interactive runs may
   prompt to install missing prerequisites; non-interactive runs must fail with
   instructions instead of changing system tooling silently.
@@ -52,9 +64,10 @@ The local install path is repo-owned and deterministic:
   `--no-skill` for binary-only installs.
 - `scripts/uninstall.sh` removes local install artifacts for agent-readiness
   testing; wallet profiles are removed only when `--config` is passed.
-- `pnpm install:local -- --dry-run` and `pnpm install:skill -- --dry-run`
-  should remain safe, non-mutating checks. `pnpm uninstall:local -- --dry-run`
-  should remain safe and non-mutating too.
+- `pnpm install:local -- --dry-run`, `pnpm install:release -- --dry-run
+--version v0.1.0`, `pnpm install:skill -- --dry-run`, `pnpm package:release
+-- --dry-run --version v0.1.0`, and `pnpm uninstall:local -- --dry-run`
+  should remain safe, non-mutating checks.
 
 When changing installation behavior, update `README.md`, package scripts, and
 the installer regression tests together. Installer scripts must not read wallet

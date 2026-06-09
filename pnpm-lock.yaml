@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@megaeth-labs/wallet-intent':
-        specifier: ^0.1.5
+        specifier: 0.1.5
         version: 0.1.5(porto@0.2.37(@wagmi/core@3.4.9(typescript@5.9.3)(viem@2.48.4(typescript@5.9.3)(zod@4.4.3)))(typescript@5.9.3)(viem@2.48.4(typescript@5.9.3)(zod@4.4.3)))(viem@2.48.4(typescript@5.9.3)(zod@4.4.3))
       commander:
         specifier: ^14.0.2

@@ -16,19 +16,35 @@ Non-TTY, CI, `NO_COLOR`, and dumb terminals also receive plain output.
 
 ## Install
 
-From this checkout:
+Public install:
+
+```bash
+curl -fsSL https://account.megaeth.com/install | sh
+```
+
+The public installer downloads the latest GitHub Release archive, verifies its
+SHA-256 checksum, installs a versioned release under
+`~/.mega/wallet-cli/releases/`, updates `~/.mega/wallet-cli/current`, writes
+the `mega` wrapper into `~/.local/bin`, removes any repo-owned legacy `wallet`
+wrapper, and installs the bundled agent skill. Add `~/.local/bin` to `PATH` if
+needed.
+
+Install a specific release:
+
+```bash
+curl -fsSL https://account.megaeth.com/install | sh -- --version v0.1.0
+```
+
+From this checkout for local development:
 
 ```bash
 ./scripts/install.sh
 ```
 
-The installer builds the CLI, installs a versioned release under
-`~/.mega/wallet-cli/releases/`, updates `~/.mega/wallet-cli/current`, writes
-the `mega` wrapper into `~/.local/bin`, removes any repo-owned legacy `wallet`
-wrapper, and installs the agent skill bundle. It checks Node.js `>=22` and pnpm
-before building. Add `~/.local/bin` to `PATH` if needed.
+The checkout installer builds from source before installing. It checks Node.js
+`>=22` and pnpm before building.
 
-Update by pulling the checkout and rerunning the installer:
+Update a checkout install by pulling and rerunning the installer:
 
 ```bash
 git pull
@@ -265,6 +281,18 @@ pnpm test
 pnpm typecheck
 pnpm lint
 pnpm install:local -- --dry-run
+pnpm install:release -- --dry-run --version v0.1.0
 pnpm install:skill -- --dry-run
+pnpm package:release -- --dry-run --version v0.1.0
 pnpm uninstall:local -- --dry-run
 ```
+
+Create release assets locally:
+
+```bash
+pnpm package:release -- --version v0.1.0
+```
+
+This writes `artifacts/mega-wallet-cli-v0.1.0.tar.gz` and its `.sha256`
+checksum. GitHub tag pushes run the same packaging path through
+`.github/workflows/release.yml`.

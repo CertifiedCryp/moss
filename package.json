@@ -20,7 +20,9 @@
     "e2e:loopback:relay-smoke": "npm run e2e:loopback -- --relay-smoke",
     "e2e:loopback:screen": "npm run e2e:loopback -- --screen-only",
     "install:local": "scripts/install.sh",
+    "install:release": "scripts/install-release.sh",
     "install:skill": "scripts/install-skill.sh",
+    "package:release": "scripts/package-release.sh",
     "uninstall:local": "scripts/uninstall.sh",
     "test": "vitest run",
     "lint": "tsc -p tsconfig.json --noEmit",
@@ -28,7 +30,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@megaeth-labs/wallet-intent": "^0.1.5",
+    "@megaeth-labs/wallet-intent": "0.1.5",
     "commander": "^14.0.2",
     "porto": "0.2.37",
     "viem": "2.48.4"

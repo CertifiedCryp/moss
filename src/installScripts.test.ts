@@ -25,7 +25,9 @@ afterEach(async () => {
 describe("installer scripts", () => {
   it("keeps shell installers syntactically valid", async () => {
     await execFileAsync("bash", ["-n", "scripts/install.sh"]);
+    await execFileAsync("sh", ["-n", "scripts/install-release.sh"]);
     await execFileAsync("bash", ["-n", "scripts/install-skill.sh"]);
+    await execFileAsync("bash", ["-n", "scripts/package-release.sh"]);
     await execFileAsync("bash", ["-n", "scripts/uninstall.sh"]);
   });
 
@@ -73,6 +75,54 @@ describe("installer scripts", () => {
 
     expect(stdout).toContain("would install release:");
     expect(stdout).not.toContain("would install codex skill:");
+  });
+
+  it("supports a dry-run release install plan", async () => {
+    const dir = await tempDir();
+
+    const { stdout } = await execFileAsync("sh", [
+      "scripts/install-release.sh",
+      "--dry-run",
+      "--version",
+      "v0.1.0",
+      "--install-root",
+      join(dir, "mega-wallet-cli"),
+      "--bin-dir",
+      join(dir, "bin"),
+      "--no-skill",
+    ]);
+
+    expect(stdout).toContain(
+      "would use asset: https://github.com/megaeth-labs/wallet-cli/releases/download/v0.1.0/mega-wallet-cli-v0.1.0.tar.gz",
+    );
+    expect(stdout).toContain(
+      `would write wrapper: ${join(dir, "bin", "mega")} -> ${join(dir, "mega-wallet-cli", "current", "dist", "index.js")}`,
+    );
+    expect(stdout).toContain(
+      `would remove legacy wallet wrapper if repo-owned: ${join(dir, "bin", "wallet")}`,
+    );
+    expect(stdout).not.toContain("would install bundled skill");
+  });
+
+  it("supports a dry-run release package plan", async () => {
+    const dir = await tempDir();
+
+    const { stdout } = await execFileAsync("bash", [
+      "scripts/package-release.sh",
+      "--dry-run",
+      "--version",
+      "v0.1.0",
+      "--out-dir",
+      join(dir, "artifacts"),
+    ]);
+
+    expect(stdout).toContain("would package release: mega-wallet-cli-v0.1.0");
+    expect(stdout).toContain(
+      `would write archive: ${join(dir, "artifacts", "mega-wallet-cli-v0.1.0.tar.gz")}`,
+    );
+    expect(stdout).toContain(
+      `would write checksum: ${join(dir, "artifacts", "mega-wallet-cli-v0.1.0.tar.gz.sha256")}`,
+    );
   });
 
   it("offers to install missing prerequisites in dry-run mode", async () => {
