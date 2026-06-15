@@ -13,11 +13,11 @@ else
       config_dir="$HOME/Library/Application Support/megaeth/wallet-cli"
       ;;
     *)
-      config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/megaeth/wallet-cli"
+      config_dir="$HOME/.config/megaeth/wallet-cli"
       ;;
   esac
 fi
-legacy_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/mega-wallet-cli"
+legacy_config_dir="$HOME/.config/mega-wallet-cli"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 claude_home="${CLAUDE_HOME:-$HOME/.claude}"
 skill_name="mega-wallet-cli"
