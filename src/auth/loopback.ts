@@ -103,7 +103,7 @@ export type DelegatedKeyPair = {
   accessAddress: HexString;
 };
 
-export type BrowserOpener = (url: string) => Promise<void> | void;
+export type BrowserOpener = (url: string) => Promise<boolean | void> | boolean | void;
 
 export type LoopbackLoginOptions = {
   network: Network;
@@ -908,27 +908,19 @@ export function keccak256(input: Uint8Array): Buffer {
   return output;
 }
 
-export async function openSystemBrowser(url: string): Promise<void> {
+export async function openSystemBrowser(url: string): Promise<boolean> {
   const { command, args } = browserCommand(url);
   const child = spawn(command, args, {
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["ignore", "ignore", "ignore"],
     windowsHide: true,
   });
 
-  let stderr = "";
-  child.stderr?.on("data", (chunk: Buffer) => {
-    stderr += chunk.toString("utf8");
+  const result = await new Promise<boolean>((resolve) => {
+    child.once("error", () => resolve(false));
+    child.once("close", (code) => resolve(code === 0));
   });
 
-  const code = await new Promise<number | null>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", resolve);
-  });
-
-  if (code !== 0) {
-    const message = stderr.trim() || `${command} exited with status ${code}`;
-    throw new CliError(`failed to open browser: ${message}`);
-  }
+  return result;
 }
 
 function handleCallbackRequest(

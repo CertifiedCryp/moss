@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 import { Command } from "commander";
 
 import { registerWalletCommands } from "./commands/wallet.js";
@@ -5,13 +7,16 @@ import { formatErrorMessage } from "./errors.js";
 
 export const commandName = "mega";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
+
 export function createCli(): Command {
   const program = new Command();
 
   program
     .name(commandName)
     .description("MegaETH MOSS account CLI")
-    .version("0.1.0")
+    .version(version)
     .showHelpAfterError()
     .exitOverride();
 

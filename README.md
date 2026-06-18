@@ -11,19 +11,27 @@ writes from a terminal or automation workflow.
 
 ### Shell Script
 
+> **Note:** The installer downloads a versioned GitHub Release asset and verifies
+> its `.sha256` checksum before installing.
+>
+> On Windows, run this command inside
+> [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) or Git Bash.
+
 ```bash
 curl -fsSL https://account.megaeth.com/install | sh
 ```
 
-The installer downloads the latest release, verifies its checksum, installs the
-`mega` command, and installs the bundled agent skill. Add the printed install
-directory to `PATH` if needed.
+The installer installs the `mega` command and the bundled agent skill. Add the
+printed install directory to `PATH` if needed.
 
 Install a specific release:
 
 ```bash
 curl -fsSL https://account.megaeth.com/install | sh -- --version v0.1.0
 ```
+
+Prefer to inspect the artifact manually first? See the
+[GitHub Releases page](https://github.com/megaeth-labs/wallet-cli/releases).
 
 ### Build From Source
 
@@ -36,6 +44,28 @@ pnpm build
 ```
 
 Requires Node.js 22 or newer and pnpm.
+
+## Uninstall
+
+Remove the CLI, installed releases, and the wrapper script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/megaeth-labs/wallet-cli/main/scripts/uninstall.sh | sh
+```
+
+To also remove local wallet profiles and delegated key material:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/megaeth-labs/wallet-cli/main/scripts/uninstall.sh | sh -- --config
+```
+
+If you installed from source:
+
+```bash
+./scripts/uninstall.sh
+# or with profile cleanup:
+./scripts/uninstall.sh --config
+```
 
 ## Quick Start
 

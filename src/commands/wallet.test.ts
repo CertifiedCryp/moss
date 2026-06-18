@@ -1103,6 +1103,56 @@ describe("wallet status commands", () => {
     expect(stdout.text).toContain("Network: mainnet");
   });
 
+
+  it("falls back to a printed auth URL when the browser cannot be opened", async () => {
+    const env = await tempEnv();
+    const stdout = memoryOutput();
+    const stderr = memoryOutput({ columns: 80, isTTY: true });
+    const program = new Command();
+    program.exitOverride();
+    registerWalletCommands(program, {
+      env,
+      now: () => activeNow,
+      openBrowser: async (url) => {
+        const authUrl = new URL(url);
+        const redirectUri = authUrl.searchParams.get("redirectUri");
+        expect(redirectUri).not.toBeNull();
+        setTimeout(async () => {
+          const callbackUrl = new URL(redirectUri!);
+          callbackUrl.searchParams.set("state", authUrl.searchParams.get("state")!);
+          callbackUrl.searchParams.set("status", "approved");
+          callbackUrl.searchParams.set(
+            "accountAddress",
+            "0x1111111111111111111111111111111111111111",
+          );
+          await fetch(callbackUrl);
+        }, 20);
+        return false;
+      },
+      stderr,
+      stdout,
+    });
+
+    await program.parseAsync([
+      "node",
+      "mega",
+      "moss",
+      "login",
+      "--wallet-url",
+      "https://wallet.example",
+      "--wallet-api-url",
+      "https://wallet-api.example",
+      "--relay-url",
+      "https://relay.example",
+    ]);
+
+    const plainStderr = stripAnsi(stderr.text);
+    expect(plainStderr).toContain("⚠️ Could not open a browser automatically.");
+    expect(plainStderr).toContain("Open this URL in your browser to continue:");
+    expect(plainStderr).toContain("Waiting for approval...");
+    expect(stdout.text).toContain("[ok] MOSS wallet connected");
+  });
+
   it("prints the login intro and auth URL in no-browser mode", async () => {
     const env = await tempEnv();
     const stdout = memoryOutput();

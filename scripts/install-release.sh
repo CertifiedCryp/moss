@@ -173,7 +173,11 @@ check_prerequisites() {
 
   node_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
   if [ "$node_major" -lt "$required_node_major" ]; then
-    error "Node.js >= $required_node_major is required; found major version $node_major"
+    error "Node.js >= $required_node_major is required, but you have Node.js $(node -v 2>/dev/null || echo unknown).
+
+To install Node.js 22:
+ • Using nvm: nvm install 22
+ • Using apt: curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs"
   fi
 }
 

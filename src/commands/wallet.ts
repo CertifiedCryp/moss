@@ -1459,7 +1459,21 @@ function makeBrowserOpener(
       return;
     }
 
-    await opener(url);
+    const opened = await opener(url);
+    if (opened === false) {
+      getStderr(dependencies).write(
+        `⚠️ Could not open a browser automatically.
+Open this URL in your browser to continue:
+
+${url}
+
+Waiting for approval...
+`,
+      );
+      return false;
+    }
+
+    return true;
   };
 }
 
