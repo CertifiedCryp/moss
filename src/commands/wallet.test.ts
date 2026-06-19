@@ -1199,6 +1199,62 @@ describe("wallet status commands", () => {
     expect(plainStderr).toContain("⚠️ Could not open a browser automatically.");
     expect(plainStderr).toContain("Open this URL in your browser to continue:");
     expect(plainStderr).toContain("Waiting for approval...");
+    expect(
+      plainStderr.match(/Open this URL in your browser to continue:/g),
+    ).toHaveLength(1);
+    expect(stdout.text).toContain("[ok] MOSS wallet connected");
+  });
+
+  it("prints a fallback auth URL after a delay while waiting for approval", async () => {
+    const env = await tempEnv();
+    const stdout = memoryOutput();
+    const stderr = memoryOutput({ columns: 80, isTTY: true });
+    const program = new Command();
+    program.exitOverride();
+    registerWalletCommands(program, {
+      browserFallbackDelayMs: 10,
+      env,
+      now: () => activeNow,
+      openBrowser: async (url) => {
+        const authUrl = new URL(url);
+        const redirectUri = authUrl.searchParams.get("redirectUri");
+        expect(redirectUri).not.toBeNull();
+        setTimeout(async () => {
+          const callbackUrl = new URL(redirectUri!);
+          callbackUrl.searchParams.set("state", authUrl.searchParams.get("state")!);
+          callbackUrl.searchParams.set("status", "approved");
+          callbackUrl.searchParams.set(
+            "accountAddress",
+            "0x1111111111111111111111111111111111111111",
+          );
+          await fetch(callbackUrl);
+        }, 30);
+        return true;
+      },
+      stderr,
+      stdout,
+    });
+
+    await program.parseAsync([
+      "node",
+      "mega",
+      "moss",
+      "login",
+      "--wallet-url",
+      "https://wallet.example",
+      "--wallet-api-url",
+      "https://wallet-api.example",
+      "--relay-url",
+      "https://relay.example",
+    ]);
+
+    const plainStderr = stripAnsi(stderr.text);
+    expect(plainStderr).toContain("Browser didn't open?");
+    expect(plainStderr).toContain("Open this URL in your browser to continue:");
+    expect(plainStderr).toContain("Waiting for approval...");
+    expect(
+      plainStderr.match(/Open this URL in your browser to continue:/g),
+    ).toHaveLength(1);
     expect(stdout.text).toContain("[ok] MOSS wallet connected");
   });
 

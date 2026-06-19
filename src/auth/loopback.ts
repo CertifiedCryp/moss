@@ -103,7 +103,14 @@ export type DelegatedKeyPair = {
   accessAddress: HexString;
 };
 
-export type BrowserOpener = (url: string) => Promise<boolean | void> | boolean | void;
+export type BrowserOpenerContext = {
+  waitForCallback?: Promise<unknown>;
+};
+
+export type BrowserOpener = (
+  url: string,
+  context?: BrowserOpenerContext,
+) => Promise<boolean | void> | boolean | void;
 
 export type LoopbackLoginOptions = {
   network: Network;
@@ -316,7 +323,9 @@ export async function runLoopbackLogin(
   waitForCallback.catch(() => undefined);
 
   try {
-    await (options.openBrowser ?? openSystemBrowser)(authUrl);
+    await (options.openBrowser ?? openSystemBrowser)(authUrl, {
+      waitForCallback,
+    });
     const callback = await waitForCallback;
 
     if (callback.status !== "approved") {
@@ -397,7 +406,9 @@ export async function authorizeLoopbackKey(
   waitForCallback.catch(() => undefined);
 
   try {
-    await (options.openBrowser ?? openSystemBrowser)(authUrl);
+    await (options.openBrowser ?? openSystemBrowser)(authUrl, {
+      waitForCallback,
+    });
     const callback = await waitForCallback;
 
     if (callback.status !== "approved") {
@@ -526,7 +537,9 @@ export async function runLoopbackRevoke(
   waitForCallback.catch(() => undefined);
 
   try {
-    await (options.openBrowser ?? openSystemBrowser)(authUrl);
+    await (options.openBrowser ?? openSystemBrowser)(authUrl, {
+      waitForCallback,
+    });
     const callback = await waitForCallback;
 
     if (callback.status !== "approved") {

@@ -138,6 +138,7 @@ type TokenMetadataReader = (options: {
 
 export type WalletCommandDependencies = {
   authorizeKey?: typeof authorizeLoopbackKey;
+  browserFallbackDelayMs?: number;
   env?: NodeJS.ProcessEnv;
   debug?: DebugCommandDependencies;
   fund?: FundCommandDependencies;
@@ -1581,10 +1582,10 @@ function makeBrowserOpener(
   renderOptions: { loginIntro?: boolean } = {},
 ): BrowserOpener {
   const opener = dependencies.openBrowser ?? openSystemBrowser;
-  return async (url) => {
+  return async (url, context) => {
     const shouldOpen = shouldOpenBrowser(options);
+    const stderr = getStderr(dependencies);
     if (renderOptions.loginIntro && !options.json && !options.terse) {
-      const stderr = getStderr(dependencies);
       const style = stderrStyle(options, dependencies);
       await renderLoginLogo({
         env: dependencies.env,
@@ -1596,14 +1597,26 @@ function makeBrowserOpener(
     }
 
     if (!shouldOpen) {
-      getStderr(dependencies).write(`Open this URL to authorize: ${url}\n`);
+      stderr.write(`Open this URL to authorize: ${url}\n`);
       return;
     }
 
-    const opened = await opener(url);
-    if (opened === false) {
-      getStderr(dependencies).write(
-        `⚠️ Could not open a browser automatically.
+    let fallbackPrinted = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearFallbackTimer = () => {
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = undefined;
+      }
+    };
+    const printFallbackUrl = (header: string) => {
+      if (fallbackPrinted) {
+        return;
+      }
+      fallbackPrinted = true;
+      clearFallbackTimer();
+      stderr.write(
+        `${header}
 Open this URL in your browser to continue:
 
 ${url}
@@ -1611,6 +1624,17 @@ ${url}
 Waiting for approval...
 `,
       );
+    };
+
+    fallbackTimer = setTimeout(() => {
+      printFallbackUrl("Browser didn't open?");
+    }, dependencies.browserFallbackDelayMs ?? 5_000);
+    fallbackTimer.unref?.();
+    context?.waitForCallback?.then(clearFallbackTimer, clearFallbackTimer);
+
+    const opened = await opener(url);
+    if (opened === false) {
+      printFallbackUrl("⚠️ Could not open a browser automatically.");
       return false;
     }
 
