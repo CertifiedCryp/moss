@@ -141,6 +141,9 @@ describe("installer scripts", () => {
       expect(script).toContain(
         'node "$install_root/current/dist/index.js" moss --help',
       );
+      expect(script.indexOf("prune_releases()")).toBeLessThan(
+        script.indexOf("write_wrapper()"),
+      );
       expect(script).toContain('prune_releases "$release_dir"');
       expect(script.indexOf("moss --help")).toBeLessThan(
         script.indexOf('prune_releases "$release_dir"'),

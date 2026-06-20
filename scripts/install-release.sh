@@ -216,6 +216,18 @@ remove_legacy_wallet_wrapper() {
   fi
 }
 
+prune_releases() {
+  keep_dir="$1"
+  release_root="$install_root/releases"
+
+  [ -d "$release_root" ] || return
+  for path in "$release_root"/* "$release_root"/.tmp-*; do
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    [ "$path" = "$keep_dir" ] && continue
+    rm -rf "$path"
+  done
+}
+
 write_wrapper() {
   target="$bin_dir/mega"
 
